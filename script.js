@@ -1,7 +1,7 @@
 /* =========================================
    ผู้ช่วยแปลภาษา
-   script.js
    Thai ↔ English
+   script.js
 ========================================= */
 
 
@@ -9,8 +9,8 @@
    CONFIG
 ========================================= */
 
-// เดี๋ยวจะใส่ URL Google Apps Script ตรงนี้
-// หลังจากสร้าง Code.gs เสร็จ
+// ตอนนี้ยังไม่ใส่ URL Apps Script
+// เดี๋ยวใส่หลังจากทำระบบแปลเสร็จ
 const API_URL = "";
 
 
@@ -26,23 +26,32 @@ let targetLanguage = "en";
    ELEMENTS
 ========================================= */
 
-const inputText = document.getElementById("inputText");
+const inputText =
+  document.getElementById("inputText");
 
-const resultText = document.getElementById("resultText");
+const resultText =
+  document.getElementById("resultText");
 
-const ocrText = document.getElementById("ocrText");
+const ocrText =
+  document.getElementById("ocrText");
 
-const ocrCard = document.getElementById("ocrCard");
+const ocrCard =
+  document.getElementById("ocrCard");
 
-const loadingBox = document.getElementById("loadingBox");
+const loadingBox =
+  document.getElementById("loadingBox");
 
-const loadingText = document.getElementById("loadingText");
+const loadingText =
+  document.getElementById("loadingText");
 
-const statusMessage = document.getElementById("statusMessage");
+const statusMessage =
+  document.getElementById("statusMessage");
 
-const cameraInput = document.getElementById("cameraInput");
+const cameraInput =
+  document.getElementById("cameraInput");
 
-const galleryInput = document.getElementById("galleryInput");
+const galleryInput =
+  document.getElementById("galleryInput");
 
 const imagePreviewContainer =
   document.getElementById("imagePreviewContainer");
@@ -88,29 +97,148 @@ const useOcrButton =
 
 
 /* =========================================
-   LANGUAGE TEXT
+   LOAD OCR ENGINE
+========================================= */
+
+let tesseractLoaded = false;
+
+
+/**
+ * โหลด Tesseract.js จาก CDN
+ */
+function loadTesseract() {
+
+  return new Promise(function(resolve, reject) {
+
+    if (window.Tesseract) {
+
+      tesseractLoaded = true;
+
+      resolve();
+
+      return;
+    }
+
+
+    const existingScript =
+      document.querySelector(
+        'script[data-tesseract="true"]'
+      );
+
+
+    if (existingScript) {
+
+      existingScript.addEventListener(
+        "load",
+        function() {
+
+          tesseractLoaded = true;
+
+          resolve();
+
+        }
+      );
+
+
+      existingScript.addEventListener(
+        "error",
+        function() {
+
+          reject(
+            new Error(
+              "ไม่สามารถโหลดระบบ OCR ได้"
+            )
+          );
+
+        }
+      );
+
+
+      return;
+    }
+
+
+    const script =
+      document.createElement("script");
+
+
+    script.src =
+      "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+
+    script.async = true;
+
+    script.dataset.tesseract = "true";
+
+
+    script.onload =
+      function() {
+
+        if (window.Tesseract) {
+
+          tesseractLoaded = true;
+
+          resolve();
+
+        } else {
+
+          reject(
+            new Error(
+              "ไม่พบระบบ Tesseract OCR"
+            )
+          );
+
+        }
+
+      };
+
+
+    script.onerror =
+      function() {
+
+        reject(
+          new Error(
+            "โหลด Tesseract OCR ไม่สำเร็จ"
+          )
+        );
+
+      };
+
+
+    document.head.appendChild(script);
+
+  });
+
+}
+
+
+/* =========================================
+   LANGUAGE UI
 ========================================= */
 
 function updateLanguageUI() {
 
   if (sourceLanguage === "th") {
 
-    sourceLanguageText.textContent = "ภาษาไทย";
+    sourceLanguageText.textContent =
+      "ภาษาไทย";
 
   } else {
 
-    sourceLanguageText.textContent = "English";
+    sourceLanguageText.textContent =
+      "English";
 
   }
 
 
   if (targetLanguage === "th") {
 
-    targetLanguageText.textContent = "ภาษาไทย";
+    targetLanguageText.textContent =
+      "ภาษาไทย";
 
   } else {
 
-    targetLanguageText.textContent = "English";
+    targetLanguageText.textContent =
+      "English";
 
   }
 
@@ -145,104 +273,136 @@ function updatePlaceholder() {
    SWAP LANGUAGE
 ========================================= */
 
-swapLanguageButton.addEventListener("click", function () {
+swapLanguageButton.addEventListener(
+  "click",
+  function() {
 
-  const oldSource = sourceLanguage;
+    const oldSource =
+      sourceLanguage;
 
-  sourceLanguage = targetLanguage;
+    sourceLanguage =
+      targetLanguage;
 
-  targetLanguage = oldSource;
-
-  updateLanguageUI();
-
-
-  /*
-    ถ้ามีคำแปลอยู่แล้ว
-    สลับข้อความต้นฉบับกับคำแปล
-  */
-
-  const currentInput =
-    inputText.value.trim();
-
-  const currentResult =
-    resultText.classList.contains("empty")
-      ? ""
-      : resultText.textContent.trim();
+    targetLanguage =
+      oldSource;
 
 
-  if (currentInput && currentResult) {
+    updateLanguageUI();
 
-    inputText.value = currentResult;
 
-    resultText.textContent = currentInput;
+    const currentInput =
+      inputText.value.trim();
 
-    resultText.classList.remove("empty");
+
+    const currentResult =
+      resultText.classList.contains("empty")
+        ? ""
+        : resultText.textContent.trim();
+
+
+    if (
+      currentInput &&
+      currentResult
+    ) {
+
+      inputText.value =
+        currentResult;
+
+      resultText.textContent =
+        currentInput;
+
+      resultText.classList.remove(
+        "empty"
+      );
+
+    }
+
+
+    showStatus(
+      "สลับภาษาเรียบร้อย",
+      "success"
+    );
 
   }
-
-
-  showStatus(
-    "สลับภาษาเรียบร้อย",
-    "success"
-  );
-
-});
+);
 
 
 /* =========================================
    CAMERA
 ========================================= */
 
-cameraButton.addEventListener("click", function () {
+cameraButton.addEventListener(
+  "click",
+  function() {
 
-  cameraInput.click();
+    cameraInput.click();
 
-});
+  }
+);
 
 
 /* =========================================
    GALLERY
 ========================================= */
 
-galleryButton.addEventListener("click", function () {
+galleryButton.addEventListener(
+  "click",
+  function() {
 
-  galleryInput.click();
+    galleryInput.click();
 
-});
+  }
+);
 
 
 /* =========================================
    CAMERA IMAGE
 ========================================= */
 
-cameraInput.addEventListener("change", function (event) {
+cameraInput.addEventListener(
+  "change",
+  function(event) {
 
-  const file = event.target.files[0];
+    const file =
+      event.target.files[0];
 
-  if (!file) {
-    return;
+
+    if (!file) {
+
+      return;
+
+    }
+
+
+    handleSelectedImage(file);
+
   }
-
-  handleSelectedImage(file);
-
-});
+);
 
 
 /* =========================================
    GALLERY IMAGE
 ========================================= */
 
-galleryInput.addEventListener("change", function (event) {
+galleryInput.addEventListener(
+  "change",
+  function(event) {
 
-  const file = event.target.files[0];
+    const file =
+      event.target.files[0];
 
-  if (!file) {
-    return;
+
+    if (!file) {
+
+      return;
+
+    }
+
+
+    handleSelectedImage(file);
+
   }
-
-  handleSelectedImage(file);
-
-});
+);
 
 
 /* =========================================
@@ -259,43 +419,44 @@ function handleSelectedImage(file) {
     );
 
     return;
+
   }
 
 
-  const reader = new FileReader();
+  const reader =
+    new FileReader();
 
 
-  reader.onload = function (event) {
+  reader.onload =
+    function(event) {
 
-    imagePreview.src = event.target.result;
+      imagePreview.src =
+        event.target.result;
 
-    imagePreviewContainer.hidden = false;
-
-    showStatus(
-      "เลือกรูปเรียบร้อย กำลังเตรียมสแกนข้อความ",
-      "success"
-    );
+      imagePreviewContainer.hidden =
+        false;
 
 
-    /*
-      ส่งรูปไป OCR
-      จะเชื่อมกับ Google Apps Script
-      ในขั้นต่อไป
-    */
-
-    runOCR(file);
-
-  };
+      showStatus(
+        "กำลังอ่านข้อความจากรูป...",
+        "success"
+      );
 
 
-  reader.onerror = function () {
+      runOCR(file);
 
-    showStatus(
-      "ไม่สามารถอ่านรูปภาพได้",
-      "error"
-    );
+    };
 
-  };
+
+  reader.onerror =
+    function() {
+
+      showStatus(
+        "ไม่สามารถอ่านรูปภาพได้",
+        "error"
+      );
+
+    };
 
 
   reader.readAsDataURL(file);
@@ -309,15 +470,230 @@ function handleSelectedImage(file) {
 
 removeImageButton.addEventListener(
   "click",
-  function () {
+  function() {
 
     imagePreview.src = "";
 
-    imagePreviewContainer.hidden = true;
+    imagePreviewContainer.hidden =
+      true;
 
     cameraInput.value = "";
 
     galleryInput.value = "";
+
+    ocrCard.hidden = true;
+
+    ocrText.value = "";
+
+  }
+);
+
+
+/* =========================================
+   OCR
+========================================= */
+
+async function runOCR(file) {
+
+  ocrCard.hidden = false;
+
+  ocrText.value =
+    "กำลังเตรียมระบบสแกนข้อความ...";
+
+
+  try {
+
+    await loadTesseract();
+
+
+    ocrText.value =
+      "กำลังอ่านข้อความจากรูป...";
+
+
+    /*
+     * thai + english
+     *
+     * Tesseract จะดาวน์โหลดข้อมูลภาษา
+     * ครั้งแรกอาจใช้เวลาสักครู่
+     */
+
+    const result =
+      await Tesseract.recognize(
+        file,
+        "tha+eng",
+        {
+
+          logger:
+            function(message) {
+
+              updateOCRProgress(
+                message
+              );
+
+            }
+
+        }
+      );
+
+
+    const text =
+      result.data.text
+        .trim();
+
+
+    if (!text) {
+
+      ocrText.value =
+        "ไม่พบข้อความในรูปภาพ";
+
+      showStatus(
+        "ไม่พบข้อความในรูปภาพ",
+        "error"
+      );
+
+      return;
+
+    }
+
+
+    ocrText.value =
+      text;
+
+
+    showStatus(
+      "สแกนข้อความเรียบร้อย ✓",
+      "success"
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "OCR Error:",
+      error
+    );
+
+
+    ocrText.value =
+      "ไม่สามารถสแกนข้อความจากรูปได้";
+
+
+    showStatus(
+      "เกิดข้อผิดพลาดในการสแกนข้อความ",
+      "error"
+    );
+
+  }
+
+}
+
+
+/* =========================================
+   OCR PROGRESS
+========================================= */
+
+function updateOCRProgress(message) {
+
+  if (!message) {
+
+    return;
+
+  }
+
+
+  if (
+    message.status ===
+    "loading tesseract core"
+  ) {
+
+    ocrText.value =
+      "กำลังโหลดระบบสแกน...";
+
+  }
+
+
+  else if (
+    message.status ===
+    "loading language traineddata"
+  ) {
+
+    ocrText.value =
+      "กำลังเตรียมภาษาไทยและอังกฤษ...";
+
+  }
+
+
+  else if (
+    message.status ===
+    "recognizing text"
+  ) {
+
+    const progress =
+      Math.round(
+        (message.progress || 0) * 100
+      );
+
+
+    ocrText.value =
+      "กำลังอ่านข้อความ... " +
+      progress +
+      "%";
+
+  }
+
+}
+
+
+/* =========================================
+   USE OCR TEXT
+========================================= */
+
+useOcrButton.addEventListener(
+  "click",
+  function() {
+
+    const text =
+      ocrText.value.trim();
+
+
+    if (
+      !text ||
+      text.includes(
+        "ไม่สามารถสแกน"
+      ) ||
+      text.includes(
+        "ไม่พบข้อความ"
+      ) ||
+      text.includes(
+        "กำลัง"
+      )
+    ) {
+
+      showStatus(
+        "ยังไม่มีข้อความที่พร้อมใช้งาน",
+        "error"
+      );
+
+      return;
+
+    }
+
+
+    inputText.value =
+      text;
+
+
+    ocrCard.hidden =
+      true;
+
+
+    showStatus(
+      "นำข้อความมาใส่ในช่องแปลแล้ว ✓",
+      "success"
+    );
+
+
+    inputText.focus();
 
   }
 );
@@ -329,19 +705,24 @@ removeImageButton.addEventListener(
 
 clearInputButton.addEventListener(
   "click",
-  function () {
+  function() {
 
-    inputText.value = "";
+    inputText.value =
+      "";
 
     resultText.textContent =
       "คำแปลจะแสดงที่นี่";
 
-    resultText.classList.add("empty");
+    resultText.classList.add(
+      "empty"
+    );
+
 
     showStatus(
       "ล้างข้อความแล้ว",
       "success"
     );
+
 
     inputText.focus();
 
@@ -355,7 +736,7 @@ clearInputButton.addEventListener(
 
 translateButton.addEventListener(
   "click",
-  function () {
+  function() {
 
     translateText();
 
@@ -383,27 +764,31 @@ async function translateText() {
     inputText.focus();
 
     return;
+
   }
 
 
   /*
-    ถ้ายังไม่มี API
-    จะแจ้งให้รู้ก่อน
-  */
+   * ตอนนี้ยังไม่ได้เชื่อม Apps Script
+   */
 
   if (!API_URL) {
 
     resultText.textContent =
-      "ระบบแปลภาษาจะเชื่อมต่อในขั้นตอนถัดไป";
+      "ระบบแปลภาษากำลังเตรียมเชื่อมต่อ...";
 
-    resultText.classList.remove("empty");
+    resultText.classList.remove(
+      "empty"
+    );
+
 
     showStatus(
-      "ข้อความพร้อมแล้ว ขั้นต่อไปจะเชื่อมระบบแปลภาษา",
+      "ส่วนสแกนข้อความพร้อมแล้ว ขั้นต่อไปเชื่อมระบบแปลภาษา",
       "success"
     );
 
     return;
+
   }
 
 
@@ -415,33 +800,44 @@ async function translateText() {
 
   try {
 
-    const response = await fetch(API_URL, {
+    const response =
+      await fetch(
+        API_URL,
+        {
 
-      method: "POST",
+          method: "POST",
 
-      headers: {
-        "Content-Type": "application/json"
-      },
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
 
-      body: JSON.stringify({
+          body:
+            JSON.stringify({
 
-        action: "translate",
+              action:
+                "translate",
 
-        text: text,
+              text:
+                text,
 
-        source: sourceLanguage,
+              source:
+                sourceLanguage,
 
-        target: targetLanguage
+              target:
+                targetLanguage
 
-      })
+            })
 
-    });
+        }
+      );
 
 
     if (!response.ok) {
 
       throw new Error(
-        "HTTP " + response.status
+        "HTTP " +
+        response.status
       );
 
     }
@@ -464,11 +860,14 @@ async function translateText() {
     resultText.textContent =
       data.translation || "";
 
-    resultText.classList.remove("empty");
+
+    resultText.classList.remove(
+      "empty"
+    );
 
 
     showStatus(
-      "แปลภาษาเรียบร้อย",
+      "แปลภาษาเรียบร้อย ✓",
       "success"
     );
 
@@ -484,14 +883,16 @@ async function translateText() {
     resultText.textContent =
       "ไม่สามารถแปลภาษาได้ในขณะนี้";
 
-    resultText.classList.remove("empty");
+
+    resultText.classList.remove(
+      "empty"
+    );
 
 
     showStatus(
       "เกิดข้อผิดพลาดในการแปลภาษา",
       "error"
     );
-
 
   } finally {
 
@@ -503,201 +904,12 @@ async function translateText() {
 
 
 /* =========================================
-   OCR
-========================================= */
-
-async function runOCR(file) {
-
-  ocrCard.hidden = false;
-
-  ocrText.value =
-    "กำลังอ่านข้อความจากรูปภาพ...";
-
-
-  /*
-    ตอนนี้เตรียมระบบไว้ก่อน
-    เดี๋ยวจะเชื่อม OCR จริงกับ Apps Script
-  */
-
-  if (!API_URL) {
-
-    ocrText.value =
-      "ระบบสแกนข้อความจากรูปจะเชื่อมต่อในขั้นตอนถัดไป";
-
-    return;
-  }
-
-
-  try {
-
-    const base64 =
-      await fileToBase64(file);
-
-
-    const response =
-      await fetch(API_URL, {
-
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json"
-        },
-
-        body: JSON.stringify({
-
-          action: "ocr",
-
-          image: base64
-
-        })
-
-      });
-
-
-    if (!response.ok) {
-
-      throw new Error(
-        "HTTP " + response.status
-      );
-
-    }
-
-
-    const data =
-      await response.json();
-
-
-    if (!data.success) {
-
-      throw new Error(
-        data.message ||
-        "OCR ไม่สำเร็จ"
-      );
-
-    }
-
-
-    ocrText.value =
-      data.text || "";
-
-
-    showStatus(
-      "สแกนข้อความเรียบร้อย",
-      "success"
-    );
-
-
-  } catch (error) {
-
-    console.error(
-      "OCR Error:",
-      error
-    );
-
-
-    ocrText.value =
-      "ไม่สามารถอ่านข้อความจากรูปได้";
-
-
-    showStatus(
-      "ไม่สามารถสแกนข้อความได้",
-      "error"
-    );
-
-  }
-
-}
-
-
-/* =========================================
-   FILE TO BASE64
-========================================= */
-
-function fileToBase64(file) {
-
-  return new Promise(
-    function (resolve, reject) {
-
-      const reader =
-        new FileReader();
-
-
-      reader.onload = function () {
-
-        resolve(
-          reader.result
-        );
-
-      };
-
-
-      reader.onerror = function () {
-
-        reject(
-          new Error(
-            "ไม่สามารถอ่านไฟล์ได้"
-          )
-        );
-
-      };
-
-
-      reader.readAsDataURL(file);
-
-    }
-  );
-
-}
-
-
-/* =========================================
-   USE OCR TEXT
-========================================= */
-
-useOcrButton.addEventListener(
-  "click",
-  function () {
-
-    const text =
-      ocrText.value.trim();
-
-
-    if (!text) {
-
-      showStatus(
-        "ไม่พบข้อความที่สแกนได้",
-        "error"
-      );
-
-      return;
-    }
-
-
-    inputText.value = text;
-
-
-    ocrCard.hidden = true;
-
-
-    showStatus(
-      "นำข้อความมาใส่ในช่องแปลแล้ว",
-      "success"
-    );
-
-
-    inputText.focus();
-
-  }
-);
-
-
-/* =========================================
    SPEAK RESULT
 ========================================= */
 
 speakResultButton.addEventListener(
   "click",
-  function () {
+  function() {
 
     const text =
       resultText.classList.contains("empty")
@@ -713,6 +925,7 @@ speakResultButton.addEventListener(
       );
 
       return;
+
     }
 
 
@@ -731,7 +944,7 @@ speakResultButton.addEventListener(
 
 speakOcrButton.addEventListener(
   "click",
-  function () {
+  function() {
 
     const text =
       ocrText.value.trim();
@@ -745,6 +958,7 @@ speakOcrButton.addEventListener(
       );
 
       return;
+
     }
 
 
@@ -761,9 +975,14 @@ speakOcrButton.addEventListener(
    TEXT TO SPEECH
 ========================================= */
 
-function speakText(text, language) {
+function speakText(
+  text,
+  language
+) {
 
-  if (!("speechSynthesis" in window)) {
+  if (
+    !("speechSynthesis" in window)
+  ) {
 
     showStatus(
       "เบราว์เซอร์นี้ไม่รองรับการออกเสียง",
@@ -771,6 +990,7 @@ function speakText(text, language) {
     );
 
     return;
+
   }
 
 
@@ -778,52 +998,62 @@ function speakText(text, language) {
 
 
   const utterance =
-    new SpeechSynthesisUtterance(text);
+    new SpeechSynthesisUtterance(
+      text
+    );
 
 
   if (language === "th") {
 
-    utterance.lang = "th-TH";
+    utterance.lang =
+      "th-TH";
 
   } else {
 
-    utterance.lang = "en-US";
+    utterance.lang =
+      "en-US";
 
   }
 
 
-  utterance.rate = 0.9;
+  utterance.rate =
+    0.9;
 
-  utterance.pitch = 1;
+  utterance.pitch =
+    1;
 
-  utterance.volume = 1;
-
-
-  utterance.onstart = function () {
-
-    showStatus(
-      "กำลังออกเสียง...",
-      "success"
-    );
-
-  };
+  utterance.volume =
+    1;
 
 
-  utterance.onend = function () {
+  utterance.onstart =
+    function() {
 
-    hideStatus();
+      showStatus(
+        "กำลังออกเสียง...",
+        "success"
+      );
 
-  };
+    };
 
 
-  utterance.onerror = function () {
+  utterance.onend =
+    function() {
 
-    showStatus(
-      "ไม่สามารถเล่นเสียงได้",
-      "error"
-    );
+      hideStatus();
 
-  };
+    };
+
+
+  utterance.onerror =
+    function() {
+
+      showStatus(
+        "ไม่สามารถเล่นเสียงได้",
+        "error"
+      );
+
+    };
 
 
   window.speechSynthesis.speak(
@@ -839,7 +1069,7 @@ function speakText(text, language) {
 
 copyResultButton.addEventListener(
   "click",
-  async function () {
+  async function() {
 
     const text =
       resultText.classList.contains("empty")
@@ -855,6 +1085,7 @@ copyResultButton.addEventListener(
       );
 
       return;
+
     }
 
 
@@ -873,23 +1104,28 @@ copyResultButton.addEventListener(
 
     } catch (error) {
 
-      /*
-        สำรองกรณี Clipboard API ใช้ไม่ได้
-      */
-
       const textarea =
-        document.createElement("textarea");
+        document.createElement(
+          "textarea"
+        );
 
 
-      textarea.value = text;
+      textarea.value =
+        text;
+
 
       document.body.appendChild(
         textarea
       );
 
+
       textarea.select();
 
-      document.execCommand("copy");
+
+      document.execCommand(
+        "copy"
+      );
+
 
       textarea.remove();
 
@@ -914,9 +1150,13 @@ function setLoading(
   message = "กำลังดำเนินการ..."
 ) {
 
-  loadingBox.hidden = !loading;
+  loadingBox.hidden =
+    !loading;
 
-  translateButton.disabled = loading;
+
+  translateButton.disabled =
+    loading;
+
 
   if (loading) {
 
@@ -940,6 +1180,7 @@ function showStatus(
   statusMessage.textContent =
     message;
 
+
   statusMessage.className =
     "status-message";
 
@@ -953,7 +1194,8 @@ function showStatus(
   }
 
 
-  statusMessage.hidden = false;
+  statusMessage.hidden =
+    false;
 
 
   clearTimeout(
@@ -963,12 +1205,12 @@ function showStatus(
 
   window.statusTimer =
     setTimeout(
-      function () {
+      function() {
 
         hideStatus();
 
       },
-      3500
+      4000
     );
 
 }
@@ -976,26 +1218,23 @@ function showStatus(
 
 function hideStatus() {
 
-  statusMessage.hidden = true;
+  statusMessage.hidden =
+    true;
 
 }
 
 
 /* =========================================
-   ENTER SHORTCUT
+   KEYBOARD SHORTCUT
 ========================================= */
 
 inputText.addEventListener(
   "keydown",
-  function (event) {
-
-    /*
-      Ctrl + Enter หรือ
-      Command + Enter = แปล
-    */
+  function(event) {
 
     if (
-      (event.ctrlKey || event.metaKey) &&
+      (event.ctrlKey ||
+       event.metaKey) &&
       event.key === "Enter"
     ) {
 
@@ -1015,8 +1254,12 @@ inputText.addEventListener(
 
 updateLanguageUI();
 
-resultText.classList.add("empty");
+
+resultText.classList.add(
+  "empty"
+);
+
 
 console.log(
-  "🌐 ผู้ช่วยแปลภาษาเริ่มทำงานแล้ว"
+  "🌐 ผู้ช่วยแปลภาษา พร้อมใช้งาน"
 );
