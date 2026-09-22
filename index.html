@@ -1,0 +1,357 @@
+```html
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+  >
+
+  <title>ผู้ช่วยแปลภาษา</title>
+
+  <!-- Google Font -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <!-- ==============================
+       APP
+  =============================== -->
+  <main class="app">
+
+    <!-- Header -->
+    <header class="app-header">
+
+      <div class="header-icon">
+        <span>🌐</span>
+      </div>
+
+      <div class="header-text">
+        <h1>ผู้ช่วยแปลภาษา</h1>
+        <p>Thai ↔ English</p>
+      </div>
+
+    </header>
+
+
+    <!-- ==============================
+         LANGUAGE SELECTOR
+    =============================== -->
+    <section class="language-card">
+
+      <div class="language-box">
+
+        <span class="flag">🇹🇭</span>
+
+        <div>
+          <small>แปลจาก</small>
+          <strong id="sourceLanguageText">ภาษาไทย</strong>
+        </div>
+
+      </div>
+
+
+      <button
+        type="button"
+        class="swap-button"
+        id="swapLanguageButton"
+        title="สลับภาษา"
+        aria-label="สลับภาษา"
+      >
+        ⇄
+      </button>
+
+
+      <div class="language-box">
+
+        <span class="flag">🇬🇧</span>
+
+        <div>
+          <small>แปลเป็น</small>
+          <strong id="targetLanguageText">English</strong>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ==============================
+         INPUT AREA
+    =============================== -->
+    <section class="translation-card">
+
+      <div class="card-title">
+
+        <span>ข้อความต้นฉบับ</span>
+
+        <button
+          type="button"
+          class="clear-button"
+          id="clearInputButton"
+          title="ล้างข้อความ"
+        >
+          ✕
+        </button>
+
+      </div>
+
+
+      <textarea
+        id="inputText"
+        class="translation-input"
+        placeholder="พิมพ์ข้อความที่ต้องการแปล..."
+        autocomplete="off"
+        spellcheck="false"
+      ></textarea>
+
+
+      <!-- ==============================
+           IMAGE ACTIONS
+      =============================== -->
+      <div class="image-actions">
+
+        <!-- Camera -->
+        <button
+          type="button"
+          class="image-action camera-action"
+          id="cameraButton"
+        >
+
+          <span class="action-icon">📷</span>
+
+          <span class="action-content">
+            <strong>ถ่ายรูป</strong>
+            <small>สแกนข้อความด้วยกล้อง</small>
+          </span>
+
+        </button>
+
+
+        <!-- Gallery -->
+        <button
+          type="button"
+          class="image-action gallery-action"
+          id="galleryButton"
+        >
+
+          <span class="action-icon">🖼️</span>
+
+          <span class="action-content">
+            <strong>เลือกรูป</strong>
+            <small>เลือกภาพจากเครื่อง</small>
+          </span>
+
+        </button>
+
+      </div>
+
+
+      <!-- Hidden image input -->
+      <input
+        type="file"
+        id="cameraInput"
+        accept="image/*"
+        capture="environment"
+        hidden
+      >
+
+      <input
+        type="file"
+        id="galleryInput"
+        accept="image/*"
+        hidden
+      >
+
+
+      <!-- Image preview -->
+      <div
+        id="imagePreviewContainer"
+        class="image-preview-container"
+        hidden
+      >
+
+        <div class="preview-header">
+
+          <span>รูปภาพที่เลือก</span>
+
+          <button
+            type="button"
+            id="removeImageButton"
+            class="remove-image-button"
+          >
+            ลบรูป
+          </button>
+
+        </div>
+
+        <img
+          id="imagePreview"
+          class="image-preview"
+          alt="ตัวอย่างรูปภาพ"
+        >
+
+      </div>
+
+
+      <!-- Translate button -->
+      <button
+        type="button"
+        class="translate-button"
+        id="translateButton"
+      >
+
+        <span class="translate-icon">✨</span>
+
+        <span>แปลภาษา</span>
+
+      </button>
+
+    </section>
+
+
+    <!-- ==============================
+         RESULT
+    =============================== -->
+    <section class="result-card">
+
+      <div class="card-title">
+
+        <span>คำแปล</span>
+
+        <div class="result-actions">
+
+          <button
+            type="button"
+            class="icon-button"
+            id="speakResultButton"
+            title="ฟังการออกเสียง"
+            aria-label="ฟังการออกเสียง"
+          >
+            🔊
+          </button>
+
+          <button
+            type="button"
+            class="icon-button"
+            id="copyResultButton"
+            title="คัดลอก"
+            aria-label="คัดลอก"
+          >
+            📋
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div
+        id="resultText"
+        class="result-text empty"
+      >
+        คำแปลจะแสดงที่นี่
+      </div>
+
+
+      <!-- Result loading -->
+      <div
+        id="loadingBox"
+        class="loading-box"
+        hidden
+      >
+
+        <div class="loading-spinner"></div>
+
+        <span id="loadingText">
+          กำลังแปลภาษา...
+        </span>
+
+      </div>
+
+    </section>
+
+
+    <!-- ==============================
+         OCR RESULT
+    =============================== -->
+    <section
+      id="ocrCard"
+      class="ocr-card"
+      hidden
+    >
+
+      <div class="card-title">
+
+        <span>ข้อความที่สแกนได้</span>
+
+        <button
+          type="button"
+          class="icon-button"
+          id="speakOcrButton"
+          title="ฟังข้อความ"
+          aria-label="ฟังข้อความ"
+        >
+          🔊
+        </button>
+
+      </div>
+
+
+      <textarea
+        id="ocrText"
+        class="ocr-text"
+        placeholder="ข้อความจากรูปภาพจะแสดงที่นี่..."
+      ></textarea>
+
+
+      <button
+        type="button"
+        class="use-ocr-button"
+        id="useOcrButton"
+      >
+        ใช้ข้อความนี้เพื่อแปล
+      </button>
+
+    </section>
+
+
+    <!-- ==============================
+         STATUS
+    =============================== -->
+    <div
+      id="statusMessage"
+      class="status-message"
+      hidden
+    ></div>
+
+
+    <!-- Footer -->
+    <footer class="app-footer">
+
+      <span>🌐</span>
+
+      <span>
+        ผู้ช่วยแปลภาษา ไทย ↔ อังกฤษ
+      </span>
+
+    </footer>
+
+  </main>
+
+
+  <!-- JavaScript -->
+  <script src="script.js"></script>
+
+</body>
+</html>
+```
