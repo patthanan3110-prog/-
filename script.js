@@ -9,7 +9,7 @@
    CONFIG
 ========================================= */
 
-const API_URL = "";
+const API_URL = "https://script.google.com/macros/s/AKfycbyv4x3GhyXGKGQvWfmh-lKForJ_OV7BVtoglDGsGjtNYID8cf1Lwkog3rk3ROLJJsng/exec";
 
 let sourceLanguage = "th";
 let targetLanguage = "en";
