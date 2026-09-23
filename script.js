@@ -13,7 +13,6 @@
 const API_URL =
   "https://script.google.com/macros/s/AKfycbyv4x3GhyXGKGQvWfmh-lKForJ_OV7BVtoglDGsGjtNYID8cf1Lwkog3rk3ROLJJsng/exec";
 
-
 let sourceLanguage = "th";
 let targetLanguage = "en";
 
@@ -99,30 +98,20 @@ const useOcrButton =
 function updateLanguageUI() {
 
   if (sourceLanguage === "th") {
-
     sourceLanguageText.textContent =
       "ภาษาไทย";
-
   } else {
-
     sourceLanguageText.textContent =
       "English";
-
   }
-
 
   if (targetLanguage === "th") {
-
     targetLanguageText.textContent =
       "ภาษาไทย";
-
   } else {
-
     targetLanguageText.textContent =
       "English";
-
   }
-
 
   updatePlaceholder();
 }
@@ -145,7 +134,6 @@ function updatePlaceholder() {
       "Type English text to translate...";
 
   }
-
 }
 
 
@@ -166,19 +154,15 @@ swapLanguageButton.addEventListener(
     targetLanguage =
       oldSource;
 
-
     updateLanguageUI();
-
 
     const currentInput =
       inputText.value.trim();
-
 
     const currentResult =
       resultText.classList.contains("empty")
         ? ""
         : resultText.textContent.trim();
-
 
     if (
       currentInput &&
@@ -188,17 +172,13 @@ swapLanguageButton.addEventListener(
       inputText.value =
         currentResult;
 
-
       resultText.textContent =
         currentInput;
-
 
       resultText.classList.remove(
         "empty"
       );
-
     }
-
 
     showStatus(
       "สลับภาษาเรียบร้อย",
@@ -248,11 +228,9 @@ cameraInput.addEventListener(
     const file =
       event.target.files[0];
 
-
     if (!file) {
       return;
     }
-
 
     handleSelectedImage(file);
 
@@ -271,11 +249,9 @@ galleryInput.addEventListener(
     const file =
       event.target.files[0];
 
-
     if (!file) {
       return;
     }
-
 
     handleSelectedImage(file);
 
@@ -299,13 +275,10 @@ function handleSelectedImage(file) {
     );
 
     return;
-
   }
-
 
   const reader =
     new FileReader();
-
 
   reader.onload =
     function (event) {
@@ -313,29 +286,23 @@ function handleSelectedImage(file) {
       imagePreview.src =
         event.target.result;
 
-
       imagePreviewContainer.hidden =
         false;
-
 
       ocrCard.hidden =
         false;
 
-
       ocrText.value =
-        "กำลังเตรียมส่งรูปให้ระบบ OCR...";
-
+        "กำลังเตรียมส่งรูปให้ Google Vision...";
 
       showStatus(
-        "กำลังอ่านข้อความจากรูป...",
+        "กำลังอ่านข้อความด้วย Google Vision...",
         "success"
       );
-
 
       runOCR(file);
 
     };
-
 
   reader.onerror =
     function () {
@@ -347,9 +314,7 @@ function handleSelectedImage(file) {
 
     };
 
-
   reader.readAsDataURL(file);
-
 }
 
 
@@ -364,22 +329,17 @@ removeImageButton.addEventListener(
     imagePreview.src =
       "";
 
-
     imagePreviewContainer.hidden =
       true;
-
 
     cameraInput.value =
       "";
 
-
     galleryInput.value =
       "";
 
-
     ocrCard.hidden =
       true;
-
 
     ocrText.value =
       "";
@@ -400,13 +360,11 @@ function prepareOCRImage(file) {
       const reader =
         new FileReader();
 
-
       reader.onload =
         function (event) {
 
           const img =
             new Image();
-
 
           img.onload =
             function () {
@@ -421,11 +379,8 @@ function prepareOCRImage(file) {
 
 
                 /*
-                 * Cloud Vision ทำงานได้ดีกับรูป
-                 * ที่มีความละเอียดพอสมควร
-                 *
-                 * เราจะลดเฉพาะรูปที่ใหญ่มาก
-                 * เพื่อไม่ให้ส่งไฟล์ใหญ่เกินจำเป็น
+                 * จำกัดขนาดภาพสูงสุด
+                 * แต่ยังรักษาความละเอียดไว้สูง
                  */
 
                 const maxSize =
@@ -443,12 +398,10 @@ function prepareOCRImage(file) {
                       maxSize / height
                     );
 
-
                   width =
                     Math.round(
                       width * scale
                     );
-
 
                   height =
                     Math.round(
@@ -463,10 +416,8 @@ function prepareOCRImage(file) {
                     "canvas"
                   );
 
-
                 canvas.width =
                   width;
-
 
                 canvas.height =
                   height;
@@ -478,23 +429,18 @@ function prepareOCRImage(file) {
                   );
 
 
-                /*
-                 * ใช้ภาพสีต้นฉบับ
-                 *
-                 * ไม่ทำ threshold
-                 * ไม่ทำ grayscale
-                 *
-                 * เพราะ Cloud Vision สามารถจัดการ
-                 * ภาพจริงได้ดีกว่าการทำภาพดำ/ขาว
-                 */
-
                 ctx.imageSmoothingEnabled =
                   true;
-
 
                 ctx.imageSmoothingQuality =
                   "high";
 
+
+                /*
+                 * ใช้ภาพสี
+                 * ไม่ทำ threshold
+                 * ไม่ทำ grayscale
+                 */
 
                 ctx.drawImage(
                   img,
@@ -506,13 +452,13 @@ function prepareOCRImage(file) {
 
 
                 /*
-                 * บีบอัดเป็น JPEG คุณภาพสูง
+                 * JPEG คุณภาพสูง
                  */
 
                 const dataURL =
                   canvas.toDataURL(
                     "image/jpeg",
-                    0.92
+                    0.95
                   );
 
 
@@ -561,7 +507,6 @@ function prepareOCRImage(file) {
 
     }
   );
-
 }
 
 
@@ -574,28 +519,29 @@ async function runOCR(file) {
   ocrCard.hidden =
     false;
 
-
   ocrText.value =
     "กำลังเตรียมรูปภาพ...";
 
 
   try {
 
-    /*
-     * เตรียมรูปภาพ
-     */
+    /* ---------------------------------------
+       STEP 1
+       เตรียมรูป
+    --------------------------------------- */
 
     const imageData =
       await prepareOCRImage(file);
 
 
+    /* ---------------------------------------
+       STEP 2
+       ส่งรูปไป Google Vision
+    --------------------------------------- */
+
     ocrText.value =
       "กำลังส่งรูปให้ Google Vision...";
 
-
-    /*
-     * ส่งรูปไป Apps Script
-     */
 
     const response =
       await fetch(
@@ -628,6 +574,10 @@ async function runOCR(file) {
       );
 
 
+    /* ---------------------------------------
+       ตรวจสอบ HTTP
+    --------------------------------------- */
+
     if (!response.ok) {
 
       throw new Error(
@@ -638,6 +588,11 @@ async function runOCR(file) {
     }
 
 
+    /* ---------------------------------------
+       STEP 3
+       รับข้อมูลกลับ
+    --------------------------------------- */
+
     ocrText.value =
       "กำลังรับข้อความจาก Google Vision...";
 
@@ -646,9 +601,9 @@ async function runOCR(file) {
       await response.json();
 
 
-    /*
-     * ตรวจสอบผลลัพธ์
-     */
+    /* ---------------------------------------
+       ตรวจสอบผลลัพธ์
+    --------------------------------------- */
 
     if (!data.success) {
 
@@ -667,6 +622,10 @@ async function runOCR(file) {
       ).trim();
 
 
+    /* ---------------------------------------
+       ไม่มีข้อความ
+    --------------------------------------- */
+
     if (!text) {
 
       ocrText.value =
@@ -684,9 +643,9 @@ async function runOCR(file) {
     }
 
 
-    /*
-     * ทำความสะอาดข้อความเล็กน้อย
-     */
+    /* ---------------------------------------
+       ทำความสะอาดข้อความ
+    --------------------------------------- */
 
     const cleanedText =
       cleanOCRText(text);
@@ -727,7 +686,6 @@ async function runOCR(file) {
     );
 
   }
-
 }
 
 
@@ -747,7 +705,7 @@ function cleanOCRText(text) {
 
 
   /*
-   * เปลี่ยน CRLF เป็น LF
+   * CRLF → LF
    */
 
   cleaned =
@@ -769,7 +727,7 @@ function cleanOCRText(text) {
 
 
   /*
-   * ลดบรรทัดว่างมากเกินไป
+   * ลดบรรทัดว่าง
    */
 
   cleaned =
@@ -780,7 +738,7 @@ function cleanOCRText(text) {
 
 
   /*
-   * ตัดช่องว่างต้น/ท้ายบรรทัด
+   * ตัดช่องว่างหัวท้ายแต่ละบรรทัด
    */
 
   cleaned =
@@ -797,7 +755,6 @@ function cleanOCRText(text) {
 
 
   return cleaned.trim();
-
 }
 
 
@@ -831,9 +788,7 @@ useOcrButton.addEventListener(
         "error"
       );
 
-
       return;
-
     }
 
 
@@ -921,12 +876,9 @@ async function translateText() {
       "error"
     );
 
-
     inputText.focus();
 
-
     return;
-
   }
 
 
@@ -948,7 +900,6 @@ async function translateText() {
 
 
     return;
-
   }
 
 
@@ -1055,12 +1006,12 @@ async function translateText() {
       "error"
     );
 
+
   } finally {
 
     setLoading(false);
 
   }
-
 }
 
 
@@ -1085,9 +1036,7 @@ speakResultButton.addEventListener(
         "error"
       );
 
-
       return;
-
     }
 
 
@@ -1119,9 +1068,7 @@ speakOcrButton.addEventListener(
         "error"
       );
 
-
       return;
-
     }
 
 
@@ -1152,9 +1099,7 @@ function speakText(
       "error"
     );
 
-
     return;
-
   }
 
 
@@ -1218,7 +1163,6 @@ function speakText(
   window.speechSynthesis.speak(
     utterance
   );
-
 }
 
 
@@ -1243,9 +1187,7 @@ copyResultButton.addEventListener(
         "error"
       );
 
-
       return;
-
     }
 
 
@@ -1324,7 +1266,6 @@ function setLoading(
       message;
 
   }
-
 }
 
 
@@ -1372,7 +1313,6 @@ function showStatus(
       },
       5000
     );
-
 }
 
 
@@ -1380,7 +1320,6 @@ function hideStatus() {
 
   statusMessage.hidden =
     true;
-
 }
 
 
@@ -1399,7 +1338,6 @@ inputText.addEventListener(
     ) {
 
       event.preventDefault();
-
 
       translateText();
 
