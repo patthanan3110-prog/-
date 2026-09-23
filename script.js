@@ -2,6 +2,7 @@
    ผู้ช่วยแปลภาษา
    Thai ↔ English
    script.js
+   Google Cloud Vision OCR
 ========================================= */
 
 
@@ -9,12 +10,12 @@
    CONFIG
 ========================================= */
 
-const API_URL = "https://script.google.com/macros/s/AKfycbyv4x3GhyXGKGQvWfmh-lKForJ_OV7BVtoglDGsGjtNYID8cf1Lwkog3rk3ROLJJsng/exec";
+const API_URL =
+  "https://script.google.com/macros/s/AKfycbyv4x3GhyXGKGQvWfmh-lKForJ_OV7BVtoglDGsGjtNYID8cf1Lwkog3rk3ROLJJsng/exec";
+
 
 let sourceLanguage = "th";
 let targetLanguage = "en";
-
-let tesseractLoaded = false;
 
 
 /* =========================================
@@ -98,16 +99,30 @@ const useOcrButton =
 function updateLanguageUI() {
 
   if (sourceLanguage === "th") {
-    sourceLanguageText.textContent = "ภาษาไทย";
+
+    sourceLanguageText.textContent =
+      "ภาษาไทย";
+
   } else {
-    sourceLanguageText.textContent = "English";
+
+    sourceLanguageText.textContent =
+      "English";
+
   }
 
+
   if (targetLanguage === "th") {
-    targetLanguageText.textContent = "ภาษาไทย";
+
+    targetLanguageText.textContent =
+      "ภาษาไทย";
+
   } else {
-    targetLanguageText.textContent = "English";
+
+    targetLanguageText.textContent =
+      "English";
+
   }
+
 
   updatePlaceholder();
 }
@@ -130,6 +145,7 @@ function updatePlaceholder() {
       "Type English text to translate...";
 
   }
+
 }
 
 
@@ -150,15 +166,19 @@ swapLanguageButton.addEventListener(
     targetLanguage =
       oldSource;
 
+
     updateLanguageUI();
+
 
     const currentInput =
       inputText.value.trim();
+
 
     const currentResult =
       resultText.classList.contains("empty")
         ? ""
         : resultText.textContent.trim();
+
 
     if (
       currentInput &&
@@ -168,18 +188,23 @@ swapLanguageButton.addEventListener(
       inputText.value =
         currentResult;
 
+
       resultText.textContent =
         currentInput;
+
 
       resultText.classList.remove(
         "empty"
       );
+
     }
+
 
     showStatus(
       "สลับภาษาเรียบร้อย",
       "success"
     );
+
   }
 );
 
@@ -223,9 +248,11 @@ cameraInput.addEventListener(
     const file =
       event.target.files[0];
 
+
     if (!file) {
       return;
     }
+
 
     handleSelectedImage(file);
 
@@ -244,9 +271,11 @@ galleryInput.addEventListener(
     const file =
       event.target.files[0];
 
+
     if (!file) {
       return;
     }
+
 
     handleSelectedImage(file);
 
@@ -260,7 +289,9 @@ galleryInput.addEventListener(
 
 function handleSelectedImage(file) {
 
-  if (!file.type.startsWith("image/")) {
+  if (
+    !file.type.startsWith("image/")
+  ) {
 
     showStatus(
       "กรุณาเลือกไฟล์รูปภาพ",
@@ -268,10 +299,13 @@ function handleSelectedImage(file) {
     );
 
     return;
+
   }
+
 
   const reader =
     new FileReader();
+
 
   reader.onload =
     function (event) {
@@ -279,23 +313,29 @@ function handleSelectedImage(file) {
       imagePreview.src =
         event.target.result;
 
+
       imagePreviewContainer.hidden =
         false;
+
 
       ocrCard.hidden =
         false;
 
+
       ocrText.value =
-        "กำลังเตรียมระบบอ่านข้อความ...";
+        "กำลังเตรียมส่งรูปให้ระบบ OCR...";
+
 
       showStatus(
         "กำลังอ่านข้อความจากรูป...",
         "success"
       );
 
+
       runOCR(file);
 
     };
+
 
   reader.onerror =
     function () {
@@ -307,7 +347,9 @@ function handleSelectedImage(file) {
 
     };
 
+
   reader.readAsDataURL(file);
+
 }
 
 
@@ -322,17 +364,22 @@ removeImageButton.addEventListener(
     imagePreview.src =
       "";
 
+
     imagePreviewContainer.hidden =
       true;
+
 
     cameraInput.value =
       "";
 
+
     galleryInput.value =
       "";
 
+
     ocrCard.hidden =
       true;
+
 
     ocrText.value =
       "";
@@ -342,131 +389,10 @@ removeImageButton.addEventListener(
 
 
 /* =========================================
-   LOAD TESSERACT
+   PREPARE IMAGE FOR CLOUD VISION
 ========================================= */
 
-function loadTesseract() {
-
-  return new Promise(
-    function (resolve, reject) {
-
-      if (window.Tesseract) {
-
-        tesseractLoaded =
-          true;
-
-        resolve();
-
-        return;
-      }
-
-      const oldScript =
-        document.querySelector(
-          'script[data-tesseract="true"]'
-        );
-
-      if (oldScript) {
-
-        oldScript.addEventListener(
-          "load",
-          function () {
-
-            if (window.Tesseract) {
-
-              tesseractLoaded =
-                true;
-
-              resolve();
-
-            } else {
-
-              reject(
-                new Error(
-                  "ไม่พบ Tesseract OCR"
-                )
-              );
-
-            }
-          }
-        );
-
-        oldScript.addEventListener(
-          "error",
-          function () {
-
-            reject(
-              new Error(
-                "โหลด Tesseract OCR ไม่สำเร็จ"
-              )
-            );
-
-          }
-        );
-
-        return;
-      }
-
-      const script =
-        document.createElement("script");
-
-      script.src =
-        "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
-
-      script.async =
-        true;
-
-      script.dataset.tesseract =
-        "true";
-
-      script.onload =
-        function () {
-
-          if (window.Tesseract) {
-
-            tesseractLoaded =
-              true;
-
-            resolve();
-
-          } else {
-
-            reject(
-              new Error(
-                "ไม่พบ Tesseract OCR"
-              )
-            );
-
-          }
-        };
-
-      script.onerror =
-        function () {
-
-          reject(
-            new Error(
-              "ไม่สามารถโหลด OCR ได้"
-            )
-          );
-
-        };
-
-      document.head.appendChild(
-        script
-      );
-
-    }
-  );
-}
-
-
-/* =========================================
-   IMAGE TO CANVAS
-========================================= */
-
-function createOCRCanvas(
-  file,
-  mode = "normal"
-) {
+function prepareOCRImage(file) {
 
   return new Promise(
     function (resolve, reject) {
@@ -474,11 +400,13 @@ function createOCRCanvas(
       const reader =
         new FileReader();
 
+
       reader.onload =
         function (event) {
 
           const img =
             new Image();
+
 
           img.onload =
             function () {
@@ -493,11 +421,16 @@ function createOCRCanvas(
 
 
                 /*
-                 * ไม่ลดรูปเล็กเกินไป
+                 * Cloud Vision ทำงานได้ดีกับรูป
+                 * ที่มีความละเอียดพอสมควร
+                 *
+                 * เราจะลดเฉพาะรูปที่ใหญ่มาก
+                 * เพื่อไม่ให้ส่งไฟล์ใหญ่เกินจำเป็น
                  */
 
                 const maxSize =
-                  2600;
+                  3200;
+
 
                 if (
                   width > maxSize ||
@@ -510,10 +443,12 @@ function createOCRCanvas(
                       maxSize / height
                     );
 
+
                   width =
                     Math.round(
                       width * scale
                     );
+
 
                   height =
                     Math.round(
@@ -523,21 +458,15 @@ function createOCRCanvas(
                 }
 
 
-                /*
-                 * ขยาย 2 เท่า
-                 */
-
-                width *= 2;
-                height *= 2;
-
-
                 const canvas =
                   document.createElement(
                     "canvas"
                   );
 
+
                 canvas.width =
                   width;
+
 
                 canvas.height =
                   height;
@@ -545,24 +474,27 @@ function createOCRCanvas(
 
                 const ctx =
                   canvas.getContext(
-                    "2d",
-                    {
-                      willReadFrequently:
-                        true
-                    }
+                    "2d"
                   );
 
+
+                /*
+                 * ใช้ภาพสีต้นฉบับ
+                 *
+                 * ไม่ทำ threshold
+                 * ไม่ทำ grayscale
+                 *
+                 * เพราะ Cloud Vision สามารถจัดการ
+                 * ภาพจริงได้ดีกว่าการทำภาพดำ/ขาว
+                 */
 
                 ctx.imageSmoothingEnabled =
                   true;
 
+
                 ctx.imageSmoothingQuality =
                   "high";
 
-
-                /*
-                 * วาดรูปต้นฉบับ
-                 */
 
                 ctx.drawImage(
                   img,
@@ -574,251 +506,17 @@ function createOCRCanvas(
 
 
                 /*
-                 * ถ้าเป็น normal
-                 * ปรับเฉพาะ contrast
+                 * บีบอัดเป็น JPEG คุณภาพสูง
                  */
 
-                if (
-                  mode === "normal"
-                ) {
-
-                  const imageData =
-                    ctx.getImageData(
-                      0,
-                      0,
-                      width,
-                      height
-                    );
-
-                  const data =
-                    imageData.data;
-
-
-                  for (
-                    let i = 0;
-                    i < data.length;
-                    i += 4
-                  ) {
-
-                    const r =
-                      data[i];
-
-                    const g =
-                      data[i + 1];
-
-                    const b =
-                      data[i + 2];
-
-
-                    let gray =
-                      (
-                        0.299 * r +
-                        0.587 * g +
-                        0.114 * b
-                      );
-
-
-                    /*
-                     * contrast กลาง ๆ
-                     */
-
-                    gray =
-                      (
-                        (gray - 128) *
-                        1.25
-                      ) + 128;
-
-
-                    gray =
-                      Math.max(
-                        0,
-                        Math.min(
-                          255,
-                          gray
-                        )
-                      );
-
-
-                    data[i] =
-                      gray;
-
-                    data[i + 1] =
-                      gray;
-
-                    data[i + 2] =
-                      gray;
-
-                  }
-
-
-                  ctx.putImageData(
-                    imageData,
-                    0,
-                    0
+                const dataURL =
+                  canvas.toDataURL(
+                    "image/jpeg",
+                    0.92
                   );
 
-                }
 
-
-                /*
-                 * mode = soft
-                 *
-                 * ปรับภาพนุ่ม ๆ
-                 * เหมาะกับกระดาษสี
-                 */
-
-                if (
-                  mode === "soft"
-                ) {
-
-                  const imageData =
-                    ctx.getImageData(
-                      0,
-                      0,
-                      width,
-                      height
-                    );
-
-                  const data =
-                    imageData.data;
-
-
-                  for (
-                    let i = 0;
-                    i < data.length;
-                    i += 4
-                  ) {
-
-                    const r =
-                      data[i];
-
-                    const g =
-                      data[i + 1];
-
-                    const b =
-                      data[i + 2];
-
-
-                    let gray =
-                      (
-                        0.299 * r +
-                        0.587 * g +
-                        0.114 * b
-                      );
-
-
-                    gray =
-                      (
-                        (gray - 128) *
-                        1.12
-                      ) + 128;
-
-
-                    gray =
-                      Math.max(
-                        0,
-                        Math.min(
-                          255,
-                          gray
-                        )
-                      );
-
-
-                    data[i] =
-                      gray;
-
-                    data[i + 1] =
-                      gray;
-
-                    data[i + 2] =
-                      gray;
-
-                  }
-
-
-                  ctx.putImageData(
-                    imageData,
-                    0,
-                    0
-                  );
-
-                }
-
-
-                /*
-                 * threshold
-                 *
-                 * ใช้เฉพาะกรณีตัวหนังสือดำ
-                 */
-
-                if (
-                  mode === "threshold"
-                ) {
-
-                  const imageData =
-                    ctx.getImageData(
-                      0,
-                      0,
-                      width,
-                      height
-                    );
-
-                  const data =
-                    imageData.data;
-
-
-                  for (
-                    let i = 0;
-                    i < data.length;
-                    i += 4
-                  ) {
-
-                    const r =
-                      data[i];
-
-                    const g =
-                      data[i + 1];
-
-                    const b =
-                      data[i + 2];
-
-
-                    let gray =
-                      (
-                        0.299 * r +
-                        0.587 * g +
-                        0.114 * b
-                      );
-
-
-                    gray =
-                      gray > 175
-                        ? 255
-                        : 0;
-
-
-                    data[i] =
-                      gray;
-
-                    data[i + 1] =
-                      gray;
-
-                    data[i + 2] =
-                      gray;
-
-                  }
-
-
-                  ctx.putImageData(
-                    imageData,
-                    0,
-                    0
-                  );
-
-                }
-
-
-                resolve(canvas);
+                resolve(dataURL);
 
               } catch (error) {
 
@@ -863,166 +561,12 @@ function createOCRCanvas(
 
     }
   );
-}
-
-
-/* =========================================
-   OCR ONE PASS
-========================================= */
-
-async function recognizeOCR(
-  image,
-  language,
-  pageMode
-) {
-
-  const result =
-    await Tesseract.recognize(
-      image,
-      language,
-      {
-
-        logger:
-          function (message) {
-
-            updateOCRProgress(
-              message
-            );
-
-          },
-
-        config: {
-
-          tessedit_pageseg_mode:
-            String(pageMode),
-
-          preserve_interword_spaces:
-            "1"
-
-        }
-
-      }
-    );
-
-
-  return {
-
-    text:
-      cleanOCRText(
-        result.data.text
-      ),
-
-    confidence:
-      Number(
-        result.data.confidence || 0
-      )
-
-  };
 
 }
 
 
 /* =========================================
-   OCR SCORE
-========================================= */
-
-function calculateOCRScore(
-  text,
-  confidence,
-  language
-) {
-
-  if (!text) {
-    return -999;
-  }
-
-
-  let score =
-    confidence;
-
-
-  /*
-   * ความยาวข้อความ
-   */
-
-  score +=
-    Math.min(
-      text.length,
-      150
-    ) * 0.08;
-
-
-  /*
-   * ภาษาไทย
-   */
-
-  const thaiCount =
-    (
-      text.match(
-        /[\u0E00-\u0E7F]/g
-      ) || []
-    ).length;
-
-
-  /*
-   * อังกฤษ
-   */
-
-  const englishCount =
-    (
-      text.match(
-        /[A-Za-z]/g
-      ) || []
-    ).length;
-
-
-  if (
-    language === "tha"
-  ) {
-
-    score +=
-      thaiCount * 1.2;
-
-    score -=
-      englishCount * 0.15;
-
-  }
-
-
-  if (
-    language === "eng"
-  ) {
-
-    score +=
-      englishCount * 0.7;
-
-  }
-
-
-  /*
-   * ลงโทษข้อความที่มีสัญลักษณ์
-   * มั่วเยอะเกินไป
-   */
-
-  const strangeCount =
-    (
-      text.match(
-        /[^ก-๙A-Za-z0-9\s.,!?'"():;/%\-–—]/g
-      ) || []
-    ).length;
-
-
-  score -=
-    strangeCount * 0.15;
-
-
-  return score;
-
-}
-
-
-/* =========================================
-   OCR MAIN
+   CLOUD VISION OCR
 ========================================= */
 
 async function runOCR(file) {
@@ -1032,244 +576,98 @@ async function runOCR(file) {
 
 
   ocrText.value =
-    "กำลังโหลดระบบอ่านข้อความ...";
+    "กำลังเตรียมรูปภาพ...";
 
 
   try {
 
-    await loadTesseract();
-
-
     /*
-     * เลือกภาษา OCR ตามภาษาต้นฉบับ
+     * เตรียมรูปภาพ
      */
 
-    const language =
-      sourceLanguage === "th"
-        ? "tha"
-        : "eng";
+    const imageData =
+      await prepareOCRImage(file);
 
-
-    /*
-     * สร้างภาพหลายแบบ
-     */
 
     ocrText.value =
-      "กำลังเตรียมภาพ..." ;
-
-
-    const normalCanvas =
-      await createOCRCanvas(
-        file,
-        "normal"
-      );
-
-
-    const softCanvas =
-      await createOCRCanvas(
-        file,
-        "soft"
-      );
-
-
-    const thresholdCanvas =
-      await createOCRCanvas(
-        file,
-        "threshold"
-      );
-
-
-    const attempts = [];
+      "กำลังส่งรูปให้ Google Vision...";
 
 
     /*
-     * รอบที่ 1
-     * normal + block
+     * ส่งรูปไป Apps Script
      */
 
-    ocrText.value =
-      "กำลังอ่านข้อความรอบที่ 1...";
+    const response =
+      await fetch(
+        API_URL,
+        {
 
+          method:
+            "POST",
 
-    try {
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
 
-      const result =
-        await recognizeOCR(
-          normalCanvas,
-          language,
-          6
-        );
+          body:
+            JSON.stringify({
 
+              action:
+                "ocr",
 
-      attempts.push({
-        ...result,
-        score:
-          calculateOCRScore(
-            result.text,
-            result.confidence,
-            language
-          )
-      });
+              image:
+                imageData,
 
-    } catch (error) {
+              source:
+                sourceLanguage
 
-      console.warn(
-        "OCR รอบที่ 1:",
-        error
+            })
+
+        }
       );
 
-    }
 
-
-    /*
-     * รอบที่ 2
-     * normal + sparse
-     *
-     * เหมาะกับข้อความ
-     * ที่ไม่ได้เรียงเต็มหน้า
-     */
-
-    ocrText.value =
-      "กำลังอ่านข้อความรอบที่ 2...";
-
-
-    try {
-
-      const result =
-        await recognizeOCR(
-          normalCanvas,
-          language,
-          11
-        );
-
-
-      attempts.push({
-        ...result,
-        score:
-          calculateOCRScore(
-            result.text,
-            result.confidence,
-            language
-          )
-      });
-
-    } catch (error) {
-
-      console.warn(
-        "OCR รอบที่ 2:",
-        error
-      );
-
-    }
-
-
-    /*
-     * รอบที่ 3
-     * soft
-     */
-
-    ocrText.value =
-      "กำลังอ่านข้อความรอบที่ 3...";
-
-
-    try {
-
-      const result =
-        await recognizeOCR(
-          softCanvas,
-          language,
-          6
-        );
-
-
-      attempts.push({
-        ...result,
-        score:
-          calculateOCRScore(
-            result.text,
-            result.confidence,
-            language
-          )
-      });
-
-    } catch (error) {
-
-      console.warn(
-        "OCR รอบที่ 3:",
-        error
-      );
-
-    }
-
-
-    /*
-     * รอบที่ 4
-     * threshold
-     */
-
-    ocrText.value =
-      "กำลังตรวจสอบข้อความอีกครั้ง...";
-
-
-    try {
-
-      const result =
-        await recognizeOCR(
-          thresholdCanvas,
-          language,
-          6
-        );
-
-
-      attempts.push({
-        ...result,
-        score:
-          calculateOCRScore(
-            result.text,
-            result.confidence,
-            language
-          )
-      });
-
-    } catch (error) {
-
-      console.warn(
-        "OCR รอบที่ 4:",
-        error
-      );
-
-    }
-
-
-    /*
-     * หาผลที่ดีที่สุด
-     */
-
-    if (
-      attempts.length === 0
-    ) {
+    if (!response.ok) {
 
       throw new Error(
-        "OCR ไม่สามารถประมวลผลได้"
+        "HTTP " +
+        response.status
       );
 
     }
 
 
-    attempts.sort(
-      function (a, b) {
-
-        return b.score - a.score;
-
-      }
-    );
+    ocrText.value =
+      "กำลังรับข้อความจาก Google Vision...";
 
 
-    const best =
-      attempts[0];
+    const data =
+      await response.json();
 
 
-    if (!best.text) {
+    /*
+     * ตรวจสอบผลลัพธ์
+     */
+
+    if (!data.success) {
+
+      throw new Error(
+        data.message ||
+        "Google Vision OCR ไม่สำเร็จ"
+      );
+
+    }
+
+
+    const text =
+      String(
+        data.text ||
+        ""
+      ).trim();
+
+
+    if (!text) {
 
       ocrText.value =
         "ไม่พบข้อความในรูปภาพ";
@@ -1280,31 +678,40 @@ async function runOCR(file) {
         "error"
       );
 
+
       return;
 
     }
 
 
+    /*
+     * ทำความสะอาดข้อความเล็กน้อย
+     */
+
+    const cleanedText =
+      cleanOCRText(text);
+
+
     ocrText.value =
-      best.text;
+      cleanedText;
 
 
     showStatus(
-      "สแกนข้อความเรียบร้อย ✓",
+      "สแกนข้อความด้วย Google Vision เรียบร้อย ✓",
       "success"
     );
 
 
     console.log(
-      "OCR results:",
-      attempts
+      "Cloud Vision OCR:",
+      cleanedText
     );
 
 
   } catch (error) {
 
     console.error(
-      "OCR Error:",
+      "Cloud Vision OCR Error:",
       error
     );
 
@@ -1314,7 +721,8 @@ async function runOCR(file) {
 
 
     showStatus(
-      "เกิดข้อผิดพลาดในการสแกนข้อความ",
+      "เกิดข้อผิดพลาดในการสแกนข้อความ: " +
+      error.message,
       "error"
     );
 
@@ -1339,7 +747,7 @@ function cleanOCRText(text) {
 
 
   /*
-   * แปลง CRLF
+   * เปลี่ยน CRLF เป็น LF
    */
 
   cleaned =
@@ -1361,7 +769,7 @@ function cleanOCRText(text) {
 
 
   /*
-   * ลดบรรทัดว่าง
+   * ลดบรรทัดว่างมากเกินไป
    */
 
   cleaned =
@@ -1372,7 +780,7 @@ function cleanOCRText(text) {
 
 
   /*
-   * ตัดช่องว่างหัวท้ายบรรทัด
+   * ตัดช่องว่างต้น/ท้ายบรรทัด
    */
 
   cleaned =
@@ -1389,74 +797,6 @@ function cleanOCRText(text) {
 
 
   return cleaned.trim();
-
-}
-
-
-/* =========================================
-   OCR PROGRESS
-========================================= */
-
-function updateOCRProgress(
-  message
-) {
-
-  if (!message) {
-    return;
-  }
-
-
-  if (
-    message.status ===
-    "loading tesseract core"
-  ) {
-
-    ocrText.value =
-      "กำลังโหลดระบบ OCR...";
-
-  }
-
-
-  else if (
-    message.status ===
-    "loading language traineddata"
-  ) {
-
-    ocrText.value =
-      "กำลังเตรียมภาษาไทยและอังกฤษ...";
-
-  }
-
-
-  else if (
-    message.status ===
-    "initializing api"
-  ) {
-
-    ocrText.value =
-      "กำลังเตรียมระบบอ่านข้อความ...";
-
-  }
-
-
-  else if (
-    message.status ===
-    "recognizing text"
-  ) {
-
-    const progress =
-      Math.round(
-        (message.progress || 0) *
-        100
-      );
-
-
-    ocrText.value =
-      "กำลังอ่านข้อความ... " +
-      progress +
-      "%";
-
-  }
 
 }
 
@@ -1490,6 +830,7 @@ useOcrButton.addEventListener(
         "ยังไม่มีข้อความที่พร้อมใช้งาน",
         "error"
       );
+
 
       return;
 
@@ -1527,8 +868,10 @@ clearInputButton.addEventListener(
     inputText.value =
       "";
 
+
     resultText.textContent =
       "คำแปลจะแสดงที่นี่";
+
 
     resultText.classList.add(
       "empty"
@@ -1578,7 +921,9 @@ async function translateText() {
       "error"
     );
 
+
     inputText.focus();
+
 
     return;
 
@@ -1597,8 +942,8 @@ async function translateText() {
 
 
     showStatus(
-      "สแกนข้อความได้แล้ว ขั้นต่อไปเชื่อมระบบแปลภาษา",
-      "success"
+      "ยังไม่ได้เชื่อมต่อระบบแปลภาษา",
+      "error"
     );
 
 
@@ -1620,7 +965,8 @@ async function translateText() {
         API_URL,
         {
 
-          method: "POST",
+          method:
+            "POST",
 
           headers: {
             "Content-Type":
@@ -1739,6 +1085,7 @@ speakResultButton.addEventListener(
         "error"
       );
 
+
       return;
 
     }
@@ -1772,6 +1119,7 @@ speakOcrButton.addEventListener(
         "error"
       );
 
+
       return;
 
     }
@@ -1804,6 +1152,7 @@ function speakText(
       "error"
     );
 
+
     return;
 
   }
@@ -1827,8 +1176,10 @@ function speakText(
   utterance.rate =
     0.9;
 
+
   utterance.pitch =
     1;
+
 
   utterance.volume =
     1;
@@ -1891,6 +1242,7 @@ copyResultButton.addEventListener(
         "ยังไม่มีข้อความให้คัดลอก",
         "error"
       );
+
 
       return;
 
@@ -2018,7 +1370,7 @@ function showStatus(
         hideStatus();
 
       },
-      4000
+      5000
     );
 
 }
@@ -2048,6 +1400,7 @@ inputText.addEventListener(
 
       event.preventDefault();
 
+
       translateText();
 
     }
@@ -2062,11 +1415,12 @@ inputText.addEventListener(
 
 updateLanguageUI();
 
+
 resultText.classList.add(
   "empty"
 );
 
 
 console.log(
-  "🌐 ผู้ช่วยแปลภาษา พร้อมใช้งาน"
+  "🌐 ผู้ช่วยแปลภาษา + Google Cloud Vision พร้อมใช้งาน"
 );
