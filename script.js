@@ -2,7 +2,7 @@
    ผู้ช่วยแปลภาษา
    Thai ↔ English
    script.js
-   Google Cloud Vision OCR
+   OCR: Tesseract.js
 ========================================= */
 
 
@@ -15,6 +15,129 @@ const API_URL =
 
 let sourceLanguage = "th";
 let targetLanguage = "en";
+
+let tesseractReady = false;
+let tesseractLoadingPromise = null;
+let tesseractWorker = null;
+
+
+/* =========================================
+   LOAD TESSERACT.JS
+========================================= */
+
+function loadTesseract() {
+
+  if (window.Tesseract) {
+    return Promise.resolve();
+  }
+
+  if (tesseractLoadingPromise) {
+    return tesseractLoadingPromise;
+  }
+
+  tesseractLoadingPromise =
+    new Promise(function (resolve, reject) {
+
+      const script =
+        document.createElement("script");
+
+      script.src =
+        "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+
+      script.onload =
+        function () {
+
+          if (window.Tesseract) {
+
+            resolve();
+
+          } else {
+
+            reject(
+              new Error(
+                "โหลด Tesseract.js ไม่สำเร็จ"
+              )
+            );
+
+          }
+
+        };
+
+      script.onerror =
+        function () {
+
+          reject(
+            new Error(
+              "ไม่สามารถโหลดระบบ OCR ได้"
+            )
+          );
+
+        };
+
+      document.head.appendChild(script);
+
+    });
+
+  return tesseractLoadingPromise;
+
+}
+
+
+/* =========================================
+   CREATE TESSERACT WORKER
+========================================= */
+
+async function getTesseractWorker() {
+
+  if (tesseractWorker) {
+    return tesseractWorker;
+  }
+
+  await loadTesseract();
+
+  /*
+   * รองรับภาษาไทย + อังกฤษ
+   */
+
+  tesseractWorker =
+    await Tesseract.createWorker(
+      "tha+eng",
+      1,
+      {
+        logger:
+          function (message) {
+
+            console.log(
+              "Tesseract:",
+              message
+            );
+
+            if (
+              message.status ===
+              "recognizing text"
+            ) {
+
+              const progress =
+                Math.round(
+                  (message.progress || 0) * 100
+                );
+
+              ocrText.value =
+                "กำลังอ่านข้อความ... " +
+                progress +
+                "%";
+
+            }
+
+          }
+      }
+    );
+
+  tesseractReady = true;
+
+  return tesseractWorker;
+
+}
 
 
 /* =========================================
@@ -124,6 +247,7 @@ function updateLanguageUI() {
 
 
   updatePlaceholder();
+
 }
 
 
@@ -319,11 +443,11 @@ function handleSelectedImage(file) {
 
 
       ocrText.value =
-        "กำลังเตรียมส่งรูปให้ Google Vision...";
+        "กำลังเตรียมระบบอ่านข้อความ...";
 
 
       showStatus(
-        "กำลังอ่านข้อความด้วย Google Vision...",
+        "กำลังอ่านข้อความจากรูป...",
         "success"
       );
 
@@ -385,7 +509,7 @@ removeImageButton.addEventListener(
 
 
 /* =========================================
-   PREPARE IMAGE FOR CLOUD VISION
+   PREPARE IMAGE
 ========================================= */
 
 function prepareOCRImage(file) {
@@ -417,12 +541,11 @@ function prepareOCRImage(file) {
 
 
                 /*
-                 * จำกัดขนาดภาพสูงสุด
-                 * แต่ยังรักษาความละเอียดไว้สูง
+                 * จำกัดขนาดภาพ
                  */
 
                 const maxSize =
-                  3200;
+                  2500;
 
 
                 if (
@@ -479,12 +602,6 @@ function prepareOCRImage(file) {
                   "high";
 
 
-                /*
-                 * ใช้ภาพสี
-                 * ไม่ทำ threshold
-                 * ไม่ทำ grayscale
-                 */
-
                 ctx.drawImage(
                   img,
                   0,
@@ -495,7 +612,7 @@ function prepareOCRImage(file) {
 
 
                 /*
-                 * JPEG คุณภาพสูง
+                 * ใช้ภาพสีคุณภาพสูง
                  */
 
                 const dataURL =
@@ -555,7 +672,7 @@ function prepareOCRImage(file) {
 
 
 /* =========================================
-   CLOUD VISION OCR
+   TESSERACT OCR
 ========================================= */
 
 async function runOCR(file) {
@@ -565,7 +682,7 @@ async function runOCR(file) {
 
 
   ocrText.value =
-    "กำลังเตรียมรูปภาพ...";
+    "กำลังเตรียมระบบ OCR...";
 
 
   try {
@@ -581,93 +698,50 @@ async function runOCR(file) {
 
     /* ---------------------------------------
        STEP 2
-       ส่งรูปไป Google Vision
+       โหลด Tesseract.js
     --------------------------------------- */
 
     ocrText.value =
-      "กำลังส่งรูปให้ Google Vision...";
+      "กำลังโหลดระบบอ่านข้อความ...";
 
 
-    const response =
-      await fetch(
-        API_URL,
-        {
-
-          method:
-            "POST",
-
-          /*
-           * ใช้ text/plain เพื่อหลีกเลี่ยง
-           * CORS preflight (OPTIONS)
-           */
-          headers: {
-            "Content-Type":
-              "text/plain;charset=utf-8"
-          },
-
-          body:
-            JSON.stringify({
-
-              action:
-                "ocr",
-
-              image:
-                imageData,
-
-              source:
-                sourceLanguage
-
-            })
-
-        }
-      );
+    showStatus(
+      "กำลังเตรียมระบบ OCR ครั้งแรก อาจใช้เวลาสักครู่...",
+      "success"
+    );
 
 
-    /* ---------------------------------------
-       ตรวจสอบ HTTP
-    --------------------------------------- */
-
-    if (!response.ok) {
-
-      throw new Error(
-        "HTTP " +
-        response.status
-      );
-
-    }
+    const worker =
+      await getTesseractWorker();
 
 
     /* ---------------------------------------
        STEP 3
-       รับข้อมูลกลับ
+       OCR
     --------------------------------------- */
 
     ocrText.value =
-      "กำลังรับข้อความจาก Google Vision...";
+      "กำลังอ่านข้อความ...";
 
 
-    const data =
-      await response.json();
+    const result =
+      await worker.recognize(
+        imageData
+      );
 
 
     /* ---------------------------------------
-       ตรวจสอบผลลัพธ์
+       STEP 4
+       รับข้อความ
     --------------------------------------- */
-
-    if (!data.success) {
-
-      throw new Error(
-        data.message ||
-        "Google Vision OCR ไม่สำเร็จ"
-      );
-
-    }
-
 
     const text =
       String(
-        data.text ||
-        ""
+        result &&
+        result.data &&
+        result.data.text
+          ? result.data.text
+          : ""
       ).trim();
 
 
@@ -705,13 +779,13 @@ async function runOCR(file) {
 
 
     showStatus(
-      "สแกนข้อความด้วย Google Vision เรียบร้อย ✓",
+      "สแกนข้อความเรียบร้อย ✓",
       "success"
     );
 
 
     console.log(
-      "Cloud Vision OCR:",
+      "Tesseract OCR:",
       cleanedText
     );
 
@@ -719,7 +793,7 @@ async function runOCR(file) {
   } catch (error) {
 
     console.error(
-      "Cloud Vision OCR Error:",
+      "Tesseract OCR Error:",
       error
     );
 
@@ -977,8 +1051,9 @@ async function translateText() {
 
           /*
            * ใช้ text/plain เพื่อหลีกเลี่ยง
-           * CORS preflight (OPTIONS)
+           * CORS preflight
            */
+
           headers: {
             "Content-Type":
               "text/plain;charset=utf-8"
@@ -1434,5 +1509,5 @@ resultText.classList.add(
 
 
 console.log(
-  "🌐 ผู้ช่วยแปลภาษา + Google Cloud Vision พร้อมใช้งาน"
+  "🌐 ผู้ช่วยแปลภาษา + Tesseract.js OCR พร้อมใช้งาน"
 );
