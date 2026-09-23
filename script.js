@@ -98,20 +98,30 @@ const useOcrButton =
 function updateLanguageUI() {
 
   if (sourceLanguage === "th") {
+
     sourceLanguageText.textContent =
       "ภาษาไทย";
+
   } else {
+
     sourceLanguageText.textContent =
       "English";
+
   }
 
+
   if (targetLanguage === "th") {
+
     targetLanguageText.textContent =
       "ภาษาไทย";
+
   } else {
+
     targetLanguageText.textContent =
       "English";
+
   }
+
 
   updatePlaceholder();
 }
@@ -134,6 +144,7 @@ function updatePlaceholder() {
       "Type English text to translate...";
 
   }
+
 }
 
 
@@ -154,7 +165,9 @@ swapLanguageButton.addEventListener(
     targetLanguage =
       oldSource;
 
+
     updateLanguageUI();
+
 
     const currentInput =
       inputText.value.trim();
@@ -163,6 +176,7 @@ swapLanguageButton.addEventListener(
       resultText.classList.contains("empty")
         ? ""
         : resultText.textContent.trim();
+
 
     if (
       currentInput &&
@@ -178,7 +192,9 @@ swapLanguageButton.addEventListener(
       resultText.classList.remove(
         "empty"
       );
+
     }
+
 
     showStatus(
       "สลับภาษาเรียบร้อย",
@@ -228,9 +244,11 @@ cameraInput.addEventListener(
     const file =
       event.target.files[0];
 
+
     if (!file) {
       return;
     }
+
 
     handleSelectedImage(file);
 
@@ -249,9 +267,11 @@ galleryInput.addEventListener(
     const file =
       event.target.files[0];
 
+
     if (!file) {
       return;
     }
+
 
     handleSelectedImage(file);
 
@@ -275,10 +295,13 @@ function handleSelectedImage(file) {
     );
 
     return;
+
   }
+
 
   const reader =
     new FileReader();
+
 
   reader.onload =
     function (event) {
@@ -286,23 +309,29 @@ function handleSelectedImage(file) {
       imagePreview.src =
         event.target.result;
 
+
       imagePreviewContainer.hidden =
         false;
+
 
       ocrCard.hidden =
         false;
 
+
       ocrText.value =
         "กำลังเตรียมส่งรูปให้ Google Vision...";
+
 
       showStatus(
         "กำลังอ่านข้อความด้วย Google Vision...",
         "success"
       );
 
+
       runOCR(file);
 
     };
+
 
   reader.onerror =
     function () {
@@ -314,7 +343,9 @@ function handleSelectedImage(file) {
 
     };
 
+
   reader.readAsDataURL(file);
+
 }
 
 
@@ -329,17 +360,22 @@ removeImageButton.addEventListener(
     imagePreview.src =
       "";
 
+
     imagePreviewContainer.hidden =
       true;
+
 
     cameraInput.value =
       "";
 
+
     galleryInput.value =
       "";
 
+
     ocrCard.hidden =
       true;
+
 
     ocrText.value =
       "";
@@ -360,11 +396,13 @@ function prepareOCRImage(file) {
       const reader =
         new FileReader();
 
+
       reader.onload =
         function (event) {
 
           const img =
             new Image();
+
 
           img.onload =
             function () {
@@ -398,10 +436,12 @@ function prepareOCRImage(file) {
                       maxSize / height
                     );
 
+
                   width =
                     Math.round(
                       width * scale
                     );
+
 
                   height =
                     Math.round(
@@ -416,8 +456,10 @@ function prepareOCRImage(file) {
                     "canvas"
                   );
 
+
                 canvas.width =
                   width;
+
 
                 canvas.height =
                   height;
@@ -431,6 +473,7 @@ function prepareOCRImage(file) {
 
                 ctx.imageSmoothingEnabled =
                   true;
+
 
                 ctx.imageSmoothingQuality =
                   "high";
@@ -507,6 +550,7 @@ function prepareOCRImage(file) {
 
     }
   );
+
 }
 
 
@@ -518,6 +562,7 @@ async function runOCR(file) {
 
   ocrCard.hidden =
     false;
+
 
   ocrText.value =
     "กำลังเตรียมรูปภาพ...";
@@ -551,9 +596,13 @@ async function runOCR(file) {
           method:
             "POST",
 
+          /*
+           * ใช้ text/plain เพื่อหลีกเลี่ยง
+           * CORS preflight (OPTIONS)
+           */
           headers: {
             "Content-Type":
-              "application/json"
+              "text/plain;charset=utf-8"
           },
 
           body:
@@ -686,6 +735,7 @@ async function runOCR(file) {
     );
 
   }
+
 }
 
 
@@ -755,6 +805,7 @@ function cleanOCRText(text) {
 
 
   return cleaned.trim();
+
 }
 
 
@@ -789,6 +840,7 @@ useOcrButton.addEventListener(
       );
 
       return;
+
     }
 
 
@@ -876,9 +928,12 @@ async function translateText() {
       "error"
     );
 
+
     inputText.focus();
 
+
     return;
+
   }
 
 
@@ -900,6 +955,7 @@ async function translateText() {
 
 
     return;
+
   }
 
 
@@ -919,9 +975,13 @@ async function translateText() {
           method:
             "POST",
 
+          /*
+           * ใช้ text/plain เพื่อหลีกเลี่ยง
+           * CORS preflight (OPTIONS)
+           */
           headers: {
             "Content-Type":
-              "application/json"
+              "text/plain;charset=utf-8"
           },
 
           body:
@@ -1012,6 +1072,7 @@ async function translateText() {
     setLoading(false);
 
   }
+
 }
 
 
@@ -1036,7 +1097,9 @@ speakResultButton.addEventListener(
         "error"
       );
 
+
       return;
+
     }
 
 
@@ -1068,7 +1131,9 @@ speakOcrButton.addEventListener(
         "error"
       );
 
+
       return;
+
     }
 
 
@@ -1099,7 +1164,9 @@ function speakText(
       "error"
     );
 
+
     return;
+
   }
 
 
@@ -1163,6 +1230,7 @@ function speakText(
   window.speechSynthesis.speak(
     utterance
   );
+
 }
 
 
@@ -1187,7 +1255,9 @@ copyResultButton.addEventListener(
         "error"
       );
 
+
       return;
+
     }
 
 
@@ -1266,6 +1336,7 @@ function setLoading(
       message;
 
   }
+
 }
 
 
@@ -1313,6 +1384,7 @@ function showStatus(
       },
       5000
     );
+
 }
 
 
@@ -1320,6 +1392,7 @@ function hideStatus() {
 
   statusMessage.hidden =
     true;
+
 }
 
 
@@ -1338,6 +1411,7 @@ inputText.addEventListener(
     ) {
 
       event.preventDefault();
+
 
       translateText();
 
