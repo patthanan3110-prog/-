@@ -95,8 +95,9 @@ async function getTesseractWorker() {
 
   await loadTesseract();
 
+
   /*
-   * รองรับภาษาไทย + อังกฤษ
+   * ไทย + อังกฤษ
    */
 
   tesseractWorker =
@@ -112,6 +113,7 @@ async function getTesseractWorker() {
               message
             );
 
+
             if (
               message.status ===
               "recognizing text"
@@ -121,6 +123,7 @@ async function getTesseractWorker() {
                 Math.round(
                   (message.progress || 0) * 100
                 );
+
 
               ocrText.value =
                 "กำลังอ่านข้อความ... " +
@@ -132,6 +135,33 @@ async function getTesseractWorker() {
           }
       }
     );
+
+
+  /*
+   * โหมด 6 =
+   * สมมติว่าข้อความเป็นกลุ่มเดียว
+   * เหมาะกับข้อความบนฉลาก/เอกสาร
+   */
+
+  try {
+
+    await tesseractWorker.setParameters({
+
+      tessedit_pageseg_mode: "6",
+
+      preserve_interword_spaces: "1"
+
+    });
+
+  } catch (error) {
+
+    console.warn(
+      "ไม่สามารถตั้งค่า OCR เพิ่มเติม:",
+      error
+    );
+
+  }
+
 
   tesseractReady = true;
 
@@ -283,8 +313,10 @@ swapLanguageButton.addEventListener(
     const oldSource =
       sourceLanguage;
 
+
     sourceLanguage =
       targetLanguage;
+
 
     targetLanguage =
       oldSource;
@@ -295,6 +327,7 @@ swapLanguageButton.addEventListener(
 
     const currentInput =
       inputText.value.trim();
+
 
     const currentResult =
       resultText.classList.contains("empty")
@@ -310,8 +343,10 @@ swapLanguageButton.addEventListener(
       inputText.value =
         currentResult;
 
+
       resultText.textContent =
         currentInput;
+
 
       resultText.classList.remove(
         "empty"
@@ -509,7 +544,7 @@ removeImageButton.addEventListener(
 
 
 /* =========================================
-   PREPARE IMAGE
+   PREPARE IMAGE FOR OCR
 ========================================= */
 
 function prepareOCRImage(file) {
@@ -533,20 +568,70 @@ function prepareOCRImage(file) {
 
               try {
 
-                let width =
+                let originalWidth =
                   img.naturalWidth;
 
-                let height =
+
+                let originalHeight =
                   img.naturalHeight;
 
 
                 /*
-                 * จำกัดขนาดภาพ
+                 * OCR ต้องการภาพที่มีรายละเอียดสูง
+                 *
+                 * ถ้ารูปเล็ก ให้ขยาย
+                 * ถ้ารูปใหญ่มาก ให้ลดลงเล็กน้อย
                  */
 
-                const maxSize =
-                  2500;
+                const minSize =
+                  2200;
 
+
+                const maxSize =
+                  3600;
+
+
+                let width =
+                  originalWidth;
+
+
+                let height =
+                  originalHeight;
+
+
+                /*
+                 * ขยายรูปเล็ก
+                 */
+
+                if (
+                  width < minSize &&
+                  height < minSize
+                ) {
+
+                  const scale =
+                    Math.max(
+                      minSize / width,
+                      minSize / height
+                    );
+
+
+                  width =
+                    Math.round(
+                      width * scale
+                    );
+
+
+                  height =
+                    Math.round(
+                      height * scale
+                    );
+
+                }
+
+
+                /*
+                 * จำกัดรูปใหญ่เกินไป
+                 */
 
                 if (
                   width > maxSize ||
@@ -590,7 +675,10 @@ function prepareOCRImage(file) {
 
                 const ctx =
                   canvas.getContext(
-                    "2d"
+                    "2d",
+                    {
+                      willReadFrequently: true
+                    }
                   );
 
 
@@ -602,6 +690,10 @@ function prepareOCRImage(file) {
                   "high";
 
 
+                /*
+                 * วาดภาพต้นฉบับ
+                 */
+
                 ctx.drawImage(
                   img,
                   0,
@@ -612,13 +704,121 @@ function prepareOCRImage(file) {
 
 
                 /*
-                 * ใช้ภาพสีคุณภาพสูง
+                 * ปรับภาพให้ตัวหนังสือเด่นขึ้น
+                 */
+
+                const imageData =
+                  ctx.getImageData(
+                    0,
+                    0,
+                    width,
+                    height
+                  );
+
+
+                const pixels =
+                  imageData.data;
+
+
+                /*
+                 * Grayscale + เพิ่ม contrast
+                 *
+                 * ช่วยให้ตัวหนังสือบนฉลาก
+                 * แยกจากพื้นหลังได้ง่ายขึ้น
+                 */
+
+                const contrast =
+                  1.25;
+
+
+                const factor =
+                  (259 *
+                    (contrast + 255)) /
+                  (255 *
+                    (259 - contrast));
+
+
+                for (
+                  let i = 0;
+                  i < pixels.length;
+                  i += 4
+                ) {
+
+                  const r =
+                    pixels[i];
+
+
+                  const g =
+                    pixels[i + 1];
+
+
+                  const b =
+                    pixels[i + 2];
+
+
+                  /*
+                   * คำนวณความสว่าง
+                   */
+
+                  let gray =
+                    (0.299 * r) +
+                    (0.587 * g) +
+                    (0.114 * b);
+
+
+                  /*
+                   * เพิ่ม contrast
+                   */
+
+                  gray =
+                    factor *
+                    (gray - 128) +
+                    128;
+
+
+                  /*
+                   * จำกัดค่า
+                   */
+
+                  gray =
+                    Math.max(
+                      0,
+                      Math.min(
+                        255,
+                        gray
+                      )
+                    );
+
+
+                  pixels[i] =
+                    gray;
+
+
+                  pixels[i + 1] =
+                    gray;
+
+
+                  pixels[i + 2] =
+                    gray;
+
+                }
+
+
+                ctx.putImageData(
+                  imageData,
+                  0,
+                  0
+                );
+
+
+                /*
+                 * ส่งออกเป็น PNG
+                 * เพื่อไม่ให้ตัวหนังสือแตกจาก JPEG
                  */
 
                 const dataURL =
                   canvas.toDataURL(
-                    "image/jpeg",
-                    0.95
+                    "image/png"
                   );
 
 
@@ -689,7 +889,7 @@ async function runOCR(file) {
 
     /* ---------------------------------------
        STEP 1
-       เตรียมรูป
+       เตรียมรูปภาพ
     --------------------------------------- */
 
     const imageData =
@@ -706,7 +906,7 @@ async function runOCR(file) {
 
 
     showStatus(
-      "กำลังเตรียมระบบ OCR ครั้งแรก อาจใช้เวลาสักครู่...",
+      "กำลังเตรียมระบบ OCR...",
       "success"
     );
 
