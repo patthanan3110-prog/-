@@ -3,7 +3,7 @@
    Thai ↔ English
    OCR + Translation
 
-   VERSION 26
+   VERSION 27
 
    จุดแก้หลัก:
    - ใช้ภาพต้นฉบับเป็นหลัก
@@ -16,9 +16,9 @@
    - กรองคำอังกฤษยาวติดกันแบบ noise
    - กรองตัวอักษรอังกฤษสลับพิมพ์ใหญ่/เล็กผิดธรรมชาติ
    - กรองบรรทัดไทยที่มีตัวเลข/สัญลักษณ์ผิดปกติ
-   - แก้ภาษาไทยที่ OCR แยกตัวอักษรออกจากกัน
-   - รวมชิ้นภาษาไทยกลับเป็นคำ/ประโยค
-   - ลดช่องว่างที่เกิดจาก OCR ภาษาไทย
+   - ใช้ symbol/bbox ช่วยประกอบภาษาไทย
+   - แก้กรณี Tesseract แยกภาษาไทยเป็นตัว ๆ
+   - กรอง unknown และ English noise
    - รองรับ Camera + Gallery
    - ไม่ hardcode รูปตัวอย่าง
 ========================================================= */
@@ -1100,18 +1100,15 @@ function getWordQuality(
     );
 
 
-  const useful =
-    thai +
-    english;
-
-
   return {
 
     confidence,
     thai,
     english,
     digits,
-    useful
+    useful:
+      thai +
+      english
 
   };
 
@@ -1307,10 +1304,9 @@ function thaiWordLooksReal(
 
   if (
     confidence < 55 &&
-    (
-      english +
-      digits
-    ) > thai
+    english +
+    digits >
+    thai
   ) {
 
     return false;
@@ -1321,25 +1317,6 @@ function thaiWordLooksReal(
   if (
     thai <= 2 &&
     confidence < 35
-  ) {
-
-    return false;
-
-  }
-
-
-  const symbols =
-    (
-      text.match(
-        /[^ก-๙a-zA-Z0-9๐-๙\s]/g
-      ) || []
-    ).length;
-
-
-  if (
-    confidence < 50 &&
-    symbols >= 4 &&
-    symbols >= thai
   ) {
 
     return false;
@@ -1372,31 +1349,31 @@ function getLineWords(
   }
 
 
-  const lineBox =
+  const box =
     line.bbox || {};
 
 
   const x0 =
     Number(
-      lineBox.x0 || 0
+      box.x0 || 0
     );
 
 
   const y0 =
     Number(
-      lineBox.y0 || 0
+      box.y0 || 0
     );
 
 
   const x1 =
     Number(
-      lineBox.x1 || 0
+      box.x1 || 0
     );
 
 
   const y1 =
     Number(
-      lineBox.y1 || 0
+      box.y1 || 0
     );
 
 
@@ -1408,31 +1385,31 @@ function getLineWords(
     of data.words
   ) {
 
-    const box =
+    const wb =
       word.bbox || {};
 
 
     const wx0 =
       Number(
-        box.x0 || 0
+        wb.x0 || 0
       );
 
 
     const wy0 =
       Number(
-        box.y0 || 0
+        wb.y0 || 0
       );
 
 
     const wx1 =
       Number(
-        box.x1 || 0
+        wb.x1 || 0
       );
 
 
     const wy1 =
       Number(
-        box.y1 || 0
+        wb.y1 || 0
       );
 
 
@@ -1444,14 +1421,12 @@ function getLineWords(
       (wy0 + wy1) / 2;
 
 
-    const inside =
+    if (
       centerX >= x0 - 10 &&
       centerX <= x1 + 10 &&
       centerY >= y0 - 10 &&
-      centerY <= y1 + 10;
-
-
-    if (inside) {
+      centerY <= y1 + 10
+    ) {
 
       words.push(
         word
@@ -1467,21 +1442,13 @@ function getLineWords(
 
       const ax =
         Number(
-          a &&
-          a.bbox &&
-          a.bbox.x0
-            ? a.bbox.x0
-            : 0
+          a?.bbox?.x0 || 0
         );
 
 
       const bx =
         Number(
-          b &&
-          b.bbox &&
-          b.bbox.x0
-            ? b.bbox.x0
-            : 0
+          b?.bbox?.x0 || 0
         );
 
 
@@ -1497,7 +1464,316 @@ function getLineWords(
 
 
 /* =========================================================
-   CLEAN THAI OCR SEGMENTS
+   GET LINE SYMBOLS
+========================================================= */
+
+function getLineSymbols(
+  data,
+  line
+) {
+
+  if (
+    !Array.isArray(
+      data.symbols
+    )
+  ) {
+
+    return [];
+
+  }
+
+
+  const box =
+    line.bbox || {};
+
+
+  const x0 =
+    Number(
+      box.x0 || 0
+    );
+
+
+  const y0 =
+    Number(
+      box.y0 || 0
+    );
+
+
+  const x1 =
+    Number(
+      box.x1 || 0
+    );
+
+
+  const y1 =
+    Number(
+      box.y1 || 0
+    );
+
+
+  const symbols = [];
+
+
+  for (
+    const symbol
+    of data.symbols
+  ) {
+
+    const sb =
+      symbol.bbox || {};
+
+
+    const sx0 =
+      Number(
+        sb.x0 || 0
+      );
+
+
+    const sy0 =
+      Number(
+        sb.y0 || 0
+      );
+
+
+    const sx1 =
+      Number(
+        sb.x1 || 0
+      );
+
+
+    const sy1 =
+      Number(
+        sb.y1 || 0
+      );
+
+
+    const centerX =
+      (sx0 + sx1) / 2;
+
+
+    const centerY =
+      (sy0 + sy1) / 2;
+
+
+    if (
+      centerX >= x0 - 8 &&
+      centerX <= x1 + 8 &&
+      centerY >= y0 - 8 &&
+      centerY <= y1 + 8
+    ) {
+
+      symbols.push(
+        symbol
+      );
+
+    }
+
+  }
+
+
+  symbols.sort(
+    (a, b) => {
+
+      const ax =
+        Number(
+          a?.bbox?.x0 || 0
+        );
+
+
+      const bx =
+        Number(
+          b?.bbox?.x0 || 0
+        );
+
+
+      return ax - bx;
+
+    }
+  );
+
+
+  return symbols;
+
+}
+
+
+/* =========================================================
+   REBUILD THAI FROM SYMBOLS
+========================================================= */
+
+function rebuildThaiFromSymbols(
+  line,
+  data
+) {
+
+  const symbols =
+    getLineSymbols(
+      data,
+      line
+    );
+
+
+  if (
+    symbols.length === 0
+  ) {
+
+    return "";
+
+  }
+
+
+  const chars = [];
+
+
+  for (
+    const symbol
+    of symbols
+  ) {
+
+    const text =
+      String(
+        symbol.text || ""
+      );
+
+
+    if (!text)
+      continue;
+
+
+    const thai =
+      countThai(
+        text
+      );
+
+
+    const english =
+      countEnglish(
+        text
+      );
+
+
+    /*
+      เอาเฉพาะ symbol ไทย
+      เพราะ worker นี้เป็นภาษาไทย
+    */
+
+    if (
+      thai === 0 &&
+      english === 0
+    ) {
+
+      continue;
+
+    }
+
+
+    if (
+      thai > 0
+    ) {
+
+      chars.push({
+
+        text,
+
+        x:
+          Number(
+            symbol?.bbox?.x0 || 0
+          ),
+
+        y:
+          Number(
+            symbol?.bbox?.y0 || 0
+          ),
+
+        width:
+          Math.max(
+            1,
+            Number(
+              symbol?.bbox?.x1 || 0
+            ) -
+            Number(
+              symbol?.bbox?.x0 || 0
+            )
+          ),
+
+        confidence:
+          Number(
+            symbol.confidence || 0
+          )
+
+      });
+
+    }
+
+  }
+
+
+  if (
+    chars.length === 0
+  ) {
+
+    return "";
+
+  }
+
+
+  chars.sort(
+    (a, b) =>
+      a.x - b.x
+  );
+
+
+  /*
+    รวม symbol ไทยเข้าด้วยกัน
+    โดยไม่ใช้ช่องว่างจาก OCR
+  */
+
+  let result = "";
+
+
+  for (
+    const char
+    of chars
+  ) {
+
+    let value =
+      char.text;
+
+
+    /*
+      ถ้าเป็นวรรณยุกต์/สระ
+      ให้ติดกับตัวก่อนหน้าเสมอ
+    */
+
+    value =
+      value.replace(
+        /\s+/g,
+        ""
+      );
+
+
+    if (!value)
+      continue;
+
+
+    result +=
+      value;
+
+  }
+
+
+  return result
+    .replace(
+      /\s+/g,
+      ""
+    )
+    .trim();
+
+}
+
+
+/* =========================================================
+   CLEAN THAI SEGMENTS
 ========================================================= */
 
 function cleanThaiSegments(
@@ -1528,17 +1804,13 @@ function cleanThaiSegments(
     let text =
       String(
         segment || ""
-      ).trim();
+      )
+      .trim();
 
 
     if (!text)
       continue;
 
-
-    /*
-      ลบช่องว่างที่ OCR แทรก
-      ระหว่างพยัญชนะ/สระ/วรรณยุกต์
-    */
 
     text =
       text.replace(
@@ -1547,76 +1819,18 @@ function cleanThaiSegments(
       );
 
 
-    /*
-      ถ้าเป็นภาษาไทย ให้ต่อกัน
-      ถ้าเป็นอังกฤษหรือตัวเลข
-      เว้นช่องว่างไว้
-    */
-
-    if (
-      /[ก-๙]/.test(
-        text
-      )
-    ) {
-
-      result +=
-        text;
-
-    } else {
-
-      if (
-        result &&
-        !result.endsWith(" ")
-      ) {
-
-        result +=
-          " ";
-
-      }
-
-
-      result +=
-        text;
-
-
-      result +=
-        " ";
-
-    }
+    result +=
+      text;
 
   }
 
 
-  result =
-    result
-      .replace(
-        /[ \t]+/g,
-        " "
-      )
-      .replace(
-        /\s+([ๆฯะาเแโใไ่้๊๋็์])/g,
-        "$1"
-      )
-      .replace(
-        /([เแโใไ])\s+/g,
-        "$1"
-      )
-      .trim();
-
-
-  /*
-    แก้กรณีที่ OCR แยกสระ/วรรณยุกต์
-    ออกมาเป็นช่องว่าง
-  */
-
-  result =
-    result.replace(
-      /([ก-๙])\s+([ก-๙])/g,
-      "$1$2"
-    );
-
-
-  return result.trim();
+  return result
+    .replace(
+      /\s+/g,
+      ""
+    )
+    .trim();
 
 }
 
@@ -1685,15 +1899,7 @@ function filterEnglishLineWords(
 
 
     if (
-      thai > english
-    ) {
-
-      continue;
-
-    }
-
-
-    if (
+      thai > english ||
       english === 0
     ) {
 
@@ -1722,26 +1928,6 @@ function filterEnglishLineWords(
     accepted.length === 0
   ) {
 
-    const lineConfidence =
-      Number(
-        line.confidence || 0
-      );
-
-
-    if (
-      lineConfidence >= 82 &&
-      countEnglish(
-        line.text
-      ) >= 2
-    ) {
-
-      return cleanText(
-        line.text
-      );
-
-    }
-
-
     return "";
 
   }
@@ -1762,6 +1948,35 @@ function filterThaiLineWords(
   line,
   data
 ) {
+
+  /*
+    สำคัญที่สุดของ Version 27
+
+    ก่อนใช้ words ให้ลองสร้างข้อความ
+    จาก symbols ก่อน
+  */
+
+  const symbolText =
+    rebuildThaiFromSymbols(
+      line,
+      data
+    );
+
+
+  if (
+    symbolText &&
+    countThai(symbolText) >= 3
+  ) {
+
+    return symbolText;
+
+  }
+
+
+  /*
+    fallback
+    ถ้า symbols ใช้ไม่ได้
+  */
 
   const words =
     getLineWords(
@@ -1822,45 +2037,6 @@ function filterThaiLineWords(
 
   }
 
-
-  if (
-    accepted.length === 0
-  ) {
-
-    const lineConfidence =
-      Number(
-        line.confidence || 0
-      );
-
-
-    if (
-      lineConfidence >= 82 &&
-      countThai(
-        line.text
-      ) >= 4
-    ) {
-
-      return cleanThaiSegments(
-        String(
-          line.text || ""
-        ).split(/\s+/)
-      );
-
-    }
-
-
-    return "";
-
-  }
-
-
-  /*
-    สำคัญ:
-    ภาษาไทยไม่ควรเอาแต่ละ OCR word
-    มาต่อด้วยช่องว่างเหมือนภาษาอังกฤษ
-
-    จึงใช้การรวมชิ้นไทยกลับเข้าด้วยกัน
-  */
 
   return cleanThaiSegments(
     accepted
@@ -1923,104 +2099,29 @@ function isGoodThaiLine(
   }
 
 
-  const words =
-    getLineWords(
-      data,
-      line
-    );
-
+  /*
+    ถ้ามีไทยเยอะพอ
+    ให้ยอมรับแม้ line confidence ต่ำ
+    เพราะภาษาไทยของ Tesseract
+    มักให้ confidence ต่ำเมื่อแยก symbol
+  */
 
   if (
-    words.length >= 2
+    thai >= 5 &&
+    english <= thai * 0.3 &&
+    digits <= 2
   ) {
 
-    let goodWords =
-      0;
-
-
-    let totalConfidence =
-      0;
-
-
-    let thaiWords =
-      0;
-
-
-    for (
-      const word
-      of words
-    ) {
-
-      const quality =
-        getWordQuality(
-          word
-        );
-
-
-      if (
-        quality.thai > 0
-      ) {
-
-        thaiWords++;
-
-        totalConfidence +=
-          quality.confidence;
-
-
-        if (
-          thaiWordLooksReal(
-            word.text,
-            quality.confidence
-          )
-        ) {
-
-          goodWords++;
-
-        }
-
-      }
-
-    }
-
-
-    const averageConfidence =
-      totalConfidence /
-      Math.max(
-        thaiWords,
-        1
-      );
-
-
-    if (
-      thaiWords >= 2 &&
-      goodWords === 0 &&
-      confidence < 70
-    ) {
-
-      return false;
-
-    }
-
-
-    if (
-      averageConfidence < 22 &&
-      confidence < 65
-    ) {
-
-      return false;
-
-    }
+    return true;
 
   }
 
 
   if (
-    confidence < 55 &&
-    (
-      english +
-      digits
-    ) >
-      thai * 0.7
+    confidence < 40 &&
+    english +
+    digits >
+    thai * 0.7
   ) {
 
     return false;
@@ -2037,11 +2138,11 @@ function isGoodThaiLine(
 
 
   if (
-    confidence < 50 &&
+    confidence < 45 &&
     symbols >
       Math.max(
-        4,
-        thai * 0.4
+        5,
+        thai * 0.5
       )
   ) {
 
@@ -2119,121 +2220,10 @@ function isGoodEnglishLine(
   }
 
 
-  const words =
-    getLineWords(
-      data,
-      line
-    );
-
-
   if (
-    words.length >= 2
-  ) {
-
-    let goodWords =
-      0;
-
-
-    let englishWords =
-      0;
-
-
-    let totalConfidence =
-      0;
-
-
-    for (
-      const word
-      of words
-    ) {
-
-      const wordText =
-        cleanText(
-          word.text || ""
-        );
-
-
-      const wordEnglish =
-        countEnglish(
-          wordText
-        );
-
-
-      const wordThai =
-        countThai(
-          wordText
-        );
-
-
-      if (
-        wordEnglish > 0 &&
-        wordEnglish >= wordThai
-      ) {
-
-        englishWords++;
-
-
-        const quality =
-          getWordQuality(
-            word
-          );
-
-
-        totalConfidence +=
-          quality.confidence;
-
-
-        if (
-          englishWordLooksReal(
-            wordText,
-            quality.confidence
-          )
-        ) {
-
-          goodWords++;
-
-        }
-
-      }
-
-    }
-
-
-    const averageConfidence =
-      totalConfidence /
-      Math.max(
-        englishWords,
-        1
-      );
-
-
-    if (
-      englishWords >= 2 &&
-      goodWords === 0 &&
-      confidence < 82
-    ) {
-
-      return false;
-
-    }
-
-
-    if (
-      averageConfidence < 22 &&
-      confidence < 65
-    ) {
-
-      return false;
-
-    }
-
-  }
-
-
-  if (
-    confidence < 55 &&
     digits >
-      english * 0.5
+    english * 0.5 &&
+    confidence < 70
   ) {
 
     return false;
@@ -2621,9 +2611,30 @@ function isEnglishNoiseLine(
 
 
   /*
-    คำเดียวที่ยาวมาก
-    และไม่มีลักษณะเป็นประโยค
+    unknown / unknown-like
   */
+
+  if (
+    words.length === 1
+  ) {
+
+    const lower =
+      words[0]
+        .toLowerCase();
+
+
+    if (
+      lower === "unknown" ||
+      lower === "unknow" ||
+      lower === "unkn0wn"
+    ) {
+
+      return true;
+
+    }
+
+  }
+
 
   if (
     words.length === 1 &&
@@ -2935,7 +2946,7 @@ function isFinalOCRNoise(
 
 
 /* =========================================================
-   MERGE THAI TEXT
+   NORMALIZE THAI TEXT
 ========================================================= */
 
 function normalizeThaiText(
@@ -2955,13 +2966,8 @@ function normalizeThaiText(
 
 
   /*
-    ลบช่องว่างระหว่างตัวอักษรไทย
-    ที่เกิดจาก OCR
-
-    เช่น
-    เธ อ ไม ่ ได ้
-    ↓
-    เธอไม่ได ้
+    ภาษาไทยไม่ควรมีช่องว่าง
+    ระหว่างตัวอักษรที่ OCR แยกออกมา
   */
 
   value =
@@ -2972,7 +2978,7 @@ function normalizeThaiText(
 
 
   /*
-    ลบช่องว่างก่อนสระ/วรรณยุกต์
+    ช่องว่างก่อนสระ/วรรณยุกต์
   */
 
   value =
@@ -2983,7 +2989,7 @@ function normalizeThaiText(
 
 
   /*
-    ลบช่องว่างหลังสระนำ
+    ช่องว่างหลังสระนำ
   */
 
   value =
@@ -2994,8 +3000,7 @@ function normalizeThaiText(
 
 
   /*
-    ลบช่องว่างที่เหลือระหว่างภาษาไทย
-    แต่ไม่ลบช่องว่างก่อนภาษาอังกฤษ
+    รวมไทยซ้ำอีกครั้ง
   */
 
   value =
@@ -3005,14 +3010,12 @@ function normalizeThaiText(
     );
 
 
-  value =
-    value.replace(
+  return value
+    .replace(
       /[ \t]+/g,
       " "
-    );
-
-
-  return value.trim();
+    )
+    .trim();
 
 }
 
@@ -3117,7 +3120,12 @@ function mergeLines(
     }
 
 
-    if (text) {
+    if (
+      text &&
+      !isFinalOCRNoise(
+        text
+      )
+    ) {
 
       output.push(
         text
@@ -3171,11 +3179,6 @@ function cleanFinalOCR(
       rawLine;
 
 
-    /*
-      ถ้ามีภาษาไทย
-      จัดช่องว่างใหม่
-    */
-
     if (
       /[ก-๙]/.test(
         line
@@ -3211,16 +3214,12 @@ function cleanFinalOCR(
       );
 
 
-    const duplicate =
+    if (
       result.some(
         old =>
           normalizeLine(old) ===
           normalized
-      );
-
-
-    if (
-      duplicate
+      )
     ) {
 
       continue;
