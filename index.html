@@ -2,6 +2,7 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
+
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
@@ -14,17 +15,17 @@
     rel="stylesheet"
   >
 
-  <link rel="stylesheet" href="style.css">
+  <link
+    rel="stylesheet"
+    href="style.css"
+  >
 </head>
 
 <body>
 
   <main class="app">
 
-    <!-- =====================================================
-         HEADER
-    ====================================================== -->
-
+    <!-- HEADER -->
     <header class="app-header">
 
       <div class="header-icon">
@@ -32,20 +33,14 @@
       </div>
 
       <div class="header-text">
-
         <h1>ผู้ช่วยแปลภาษา</h1>
-
         <p>Thai ↔ English</p>
-
       </div>
 
     </header>
 
 
-    <!-- =====================================================
-         LANGUAGE
-    ====================================================== -->
-
+    <!-- LANGUAGE -->
     <section class="language-card">
 
       <div class="language-box">
@@ -53,13 +48,11 @@
         <span class="flag">🇹🇭</span>
 
         <div>
-
           <small>แปลจาก</small>
 
           <strong id="sourceLanguageText">
             ภาษาไทย
           </strong>
-
         </div>
 
       </div>
@@ -81,13 +74,11 @@
         <span class="flag">🇬🇧</span>
 
         <div>
-
           <small>แปลเป็น</small>
 
           <strong id="targetLanguageText">
             English
           </strong>
-
         </div>
 
       </div>
@@ -95,15 +86,14 @@
     </section>
 
 
-    <!-- =====================================================
-         TRANSLATION INPUT
-    ====================================================== -->
-
+    <!-- TRANSLATION INPUT -->
     <section class="translation-card">
 
       <div class="card-title">
 
-        <span>ข้อความต้นฉบับ</span>
+        <span>
+          ข้อความต้นฉบับ
+        </span>
 
         <button
           type="button"
@@ -129,10 +119,7 @@
       ></textarea>
 
 
-      <!-- ===================================================
-           IMAGE ACTIONS
-      ==================================================== -->
-
+      <!-- IMAGE ACTIONS -->
       <div class="image-actions">
 
         <button
@@ -187,10 +174,7 @@
       </div>
 
 
-      <!-- ===================================================
-           CAMERA INPUT
-      ==================================================== -->
-
+      <!-- CAMERA -->
       <input
         type="file"
         id="cameraInput"
@@ -200,10 +184,7 @@
       >
 
 
-      <!-- ===================================================
-           GALLERY INPUT
-      ==================================================== -->
-
+      <!-- GALLERY -->
       <input
         type="file"
         id="galleryInput"
@@ -212,10 +193,7 @@
       >
 
 
-      <!-- ===================================================
-           IMAGE PREVIEW
-      ==================================================== -->
-
+      <!-- IMAGE PREVIEW -->
       <div
         id="imagePreviewContainer"
         class="image-preview-container"
@@ -248,10 +226,7 @@
       </div>
 
 
-      <!-- ===================================================
-           TRANSLATE BUTTON
-      ==================================================== -->
-
+      <!-- TRANSLATE -->
       <button
         type="button"
         class="translate-button"
@@ -271,10 +246,7 @@
     </section>
 
 
-    <!-- =====================================================
-         TRANSLATION RESULT
-    ====================================================== -->
-
+    <!-- TRANSLATION RESULT -->
     <section class="result-card">
 
       <div class="card-title">
@@ -282,7 +254,6 @@
         <span>
           คำแปล
         </span>
-
 
         <div class="result-actions">
 
@@ -320,10 +291,7 @@
       </div>
 
 
-      <!-- ===================================================
-           LOADING
-      ==================================================== -->
-
+      <!-- LOADING -->
       <div
         id="loadingBox"
         class="loading-box"
@@ -341,10 +309,7 @@
     </section>
 
 
-    <!-- =====================================================
-         OCR RESULT
-    ====================================================== -->
-
+    <!-- OCR RESULT -->
     <section
       id="ocrCard"
       class="ocr-card"
@@ -356,7 +321,6 @@
         <span>
           ข้อความที่สแกนได้
         </span>
-
 
         <button
           type="button"
@@ -393,10 +357,7 @@
     </section>
 
 
-    <!-- =====================================================
-         STATUS
-    ====================================================== -->
-
+    <!-- STATUS -->
     <div
       id="statusMessage"
       class="status-message"
@@ -406,10 +367,7 @@
     ></div>
 
 
-    <!-- =====================================================
-         FOOTER
-    ====================================================== -->
-
+    <!-- FOOTER -->
     <footer class="app-footer">
 
       <span>
@@ -425,23 +383,19 @@
   </main>
 
 
-  <!-- =======================================================
-       TESSERACT.JS
-       
-       script.js จะโหลด Tesseract แบบอัตโนมัติ
-       ไม่ต้องใส่ Tesseract ซ้ำตรงนี้
-  ======================================================== -->
+  <!--
+    Tesseract.js
+    script.js จะโหลดให้อัตโนมัติ
+  -->
 
 
-  <!-- =======================================================
-       MAIN SCRIPT
-       
-       VERSION 50
-       ป้องกัน Browser Cache ใช้ไฟล์ JS เก่า
-  ======================================================== -->
+  <!--
+    MAIN SCRIPT
+    VERSION 51
+  -->
 
   <script
-    src="script.js?v=20260924-50"
+    src="script.js?v=20260924-51"
     defer
   ></script>
 
