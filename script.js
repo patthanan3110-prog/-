@@ -3,15 +3,17 @@
    Thai ↔ English
    OCR + Translation
 
-   VERSION 32
+   VERSION 33
 
    หลักการ:
    - Camera และ Gallery แยกวิธีเตรียมภาพ
-   - Gallery รักษาวิธี OCR เดิมที่เคยอ่านได้ดี
-   - Camera เพิ่มภาพขยายสำหรับ OCR โดยไม่แก้ภาพต้นฉบับ
+   - Gallery รักษาวิธี OCR เดิม
+   - Camera เพิ่มภาพขยายสำหรับ OCR
    - ไม่ hardcode ข้อความจากรูปทดสอบ
    - ไม่ตัดข้อความตามตำแหน่งแบบตายตัว
    - แยก Thai / English OCR
+   - ตรวจสอบตำแหน่ง OCR ก่อนรวมข้อความ
+   - ลด Thai OCR hallucination ที่ทับ English OCR
    - กรอง OCR noise ด้วยคุณภาพของข้อความ
    - รองรับ Camera + Gallery
 ========================================================= */
@@ -1636,17 +1638,14 @@ function rebuildThaiFromSymbols(
       chars.push({
 
         text:
-
           text,
 
         x:
-
           Number(
             symbol?.bbox?.x0 || 0
           ),
 
         confidence:
-
           Number(
             symbol.confidence || 0
           )
@@ -2500,6 +2499,415 @@ function deduplicateLines(
 
 
 /* =========================================================
+   GEOMETRY
+   ตรวจว่ากรอบ OCR สองภาษาอยู่บริเวณเดียวกันจริงหรือไม่
+========================================================= */
+
+function verticalOverlapRatio(
+  a,
+  b
+) {
+
+  const aTop =
+    Number(a.y || 0);
+
+  const aBottom =
+    aTop +
+    Math.max(
+      1,
+      Number(a.height || 1)
+    );
+
+
+  const bTop =
+    Number(b.y || 0);
+
+  const bBottom =
+    bTop +
+    Math.max(
+      1,
+      Number(b.height || 1)
+    );
+
+
+  const overlap =
+    Math.max(
+      0,
+      Math.min(
+        aBottom,
+        bBottom
+      ) -
+      Math.max(
+        aTop,
+        bTop
+      )
+    );
+
+
+  const minHeight =
+    Math.min(
+      Math.max(
+        1,
+        Number(a.height || 1)
+      ),
+      Math.max(
+        1,
+        Number(b.height || 1)
+      )
+    );
+
+
+  return (
+    overlap /
+    minHeight
+  );
+
+}
+
+
+function horizontalOverlapRatio(
+  a,
+  b
+) {
+
+  const aLeft =
+    Number(a.x || 0);
+
+  const aRight =
+    aLeft +
+    Math.max(
+      1,
+      Number(a.width || 1)
+    );
+
+
+  const bLeft =
+    Number(b.x || 0);
+
+  const bRight =
+    bLeft +
+    Math.max(
+      1,
+      Number(b.width || 1)
+    );
+
+
+  const overlap =
+    Math.max(
+      0,
+      Math.min(
+        aRight,
+        bRight
+      ) -
+      Math.max(
+        aLeft,
+        bLeft
+      )
+    );
+
+
+  const minWidth =
+    Math.min(
+      Math.max(
+        1,
+        Number(a.width || 1)
+      ),
+      Math.max(
+        1,
+        Number(b.width || 1)
+      )
+    );
+
+
+  return (
+    overlap /
+    minWidth
+  );
+
+}
+
+
+/* =========================================================
+   OCR LINE QUALITY
+========================================================= */
+
+function getOCRLineQuality(
+  line
+) {
+
+  if (!line)
+    return 0;
+
+
+  const text =
+    cleanText(
+      line.text
+    );
+
+
+  if (!text)
+    return 0;
+
+
+  const thai =
+    countThai(
+      text
+    );
+
+
+  const english =
+    countEnglish(
+      text
+    );
+
+
+  const digits =
+    countDigits(
+      text
+    );
+
+
+  const useful =
+    thai +
+    english +
+    digits;
+
+
+  const total =
+    text.replace(
+      /\s/g,
+      ""
+    ).length;
+
+
+  if (!total)
+    return 0;
+
+
+  const usefulRatio =
+    useful /
+    total;
+
+
+  const confidence =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(
+          line.confidence || 0
+        )
+      )
+    );
+
+
+  return (
+    confidence * 0.55 +
+    usefulRatio * 100 * 0.45
+  );
+
+}
+
+
+/* =========================================================
+   LANGUAGE RATIO
+========================================================= */
+
+function getLanguageRatio(
+  text,
+  language
+) {
+
+  const value =
+    String(
+      text || ""
+    );
+
+
+  const thai =
+    countThai(
+      value
+    );
+
+
+  const english =
+    countEnglish(
+      value
+    );
+
+
+  const useful =
+    thai +
+    english;
+
+
+  if (!useful)
+    return 0;
+
+
+  if (
+    language === "thai"
+  ) {
+
+    return (
+      thai /
+      useful
+    );
+
+  }
+
+
+  return (
+    english /
+    useful
+  );
+
+}
+
+
+/* =========================================================
+   CROSS-LANGUAGE CONFLICT
+   ถ้า Thai OCR และ English OCR อยู่ทับกันจริง
+   และ English มีคุณภาพสูงกว่าอย่างชัดเจน
+   ให้ตัดเฉพาะ Thai hallucination นั้น
+========================================================= */
+
+function resolveCrossLanguageConflicts(
+  thaiLines,
+  englishLines
+) {
+
+  const keptThai = [];
+
+
+  for (
+    const thaiLine
+    of thaiLines
+  ) {
+
+    let shouldRemove =
+      false;
+
+
+    const thaiRatio =
+      getLanguageRatio(
+        thaiLine.text,
+        "thai"
+      );
+
+
+    if (
+      thaiRatio < 0.25
+    ) {
+
+      keptThai.push(
+        thaiLine
+      );
+
+      continue;
+
+    }
+
+
+    for (
+      const englishLine
+      of englishLines
+    ) {
+
+      const englishRatio =
+        getLanguageRatio(
+          englishLine.text,
+          "english"
+        );
+
+
+      if (
+        englishRatio < 0.25
+      ) {
+
+        continue;
+
+      }
+
+
+      const vertical =
+        verticalOverlapRatio(
+          thaiLine,
+          englishLine
+        );
+
+
+      const horizontal =
+        horizontalOverlapRatio(
+          thaiLine,
+          englishLine
+        );
+
+
+      /*
+        ต้องทับกันทั้งแนวตั้งและแนวนอน
+        จึงจะถือว่าอาจเป็น OCR ซ้อนกัน
+      */
+
+      if (
+        vertical < 0.45 ||
+        horizontal < 0.35
+      ) {
+
+        continue;
+
+      }
+
+
+      const thaiQuality =
+        getOCRLineQuality(
+          thaiLine
+        );
+
+
+      const englishQuality =
+        getOCRLineQuality(
+          englishLine
+        );
+
+
+      /*
+        ไม่ตัด Thai ง่ายเกินไป
+        ต้องดีกว่าชัดเจนอย่างน้อย 8 คะแนน
+      */
+
+      if (
+        englishQuality >
+        thaiQuality + 8
+      ) {
+
+        shouldRemove =
+          true;
+
+        break;
+
+      }
+
+    }
+
+
+    if (!shouldRemove) {
+
+      keptThai.push(
+        thaiLine
+      );
+
+    }
+
+  }
+
+
+  return keptThai;
+
+}
+
+
+/* =========================================================
    FINAL ENGLISH NOISE
 ========================================================= */
 
@@ -2969,11 +3377,36 @@ function mergeLines(
   englishLines
 ) {
 
+  /*
+    ก่อนรวมข้อความ:
+    ตรวจสอบว่า Thai OCR บรรทัดไหน
+    ทับกับ English OCR จริงหรือไม่
+  */
+
+  const cleanThai =
+    Array.isArray(thaiLines)
+      ? thaiLines
+      : [];
+
+
+  const cleanEnglish =
+    Array.isArray(englishLines)
+      ? englishLines
+      : [];
+
+
+  const resolvedThai =
+    resolveCrossLanguageConflicts(
+      cleanThai,
+      cleanEnglish
+    );
+
+
   const all = [
 
-    ...thaiLines,
+    ...resolvedThai,
 
-    ...englishLines
+    ...cleanEnglish
 
   ];
 
@@ -3484,7 +3917,6 @@ async function runOCR(
       =====================================================
       GALLERY
       ใช้ canvas ปกติ
-      เพื่อรักษาพฤติกรรมเดิมที่ทำงานได้ดี
       =====================================================
     */
 
@@ -3552,7 +3984,6 @@ async function runOCR(
       CAMERA
       PASS 1 = ภาพปกติ
       PASS 2 = ภาพขยาย
-      แล้วเลือกผลที่มีคุณภาพกว่า
       =====================================================
     */
 
@@ -3624,11 +4055,6 @@ async function runOCR(
 
     }
 
-
-    /*
-      ถ้าผลแรกว่าง
-      ใช้อีกผลทันที
-    */
 
     if (!finalText) {
 
