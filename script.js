@@ -5,7 +5,7 @@
 
    OCR:
    Tesseract.js
-   FOCUS CROP + OCR CORRECTION VERSION
+   General OCR + OCR CORRECTION VERSION
 ========================================= */
 
 
@@ -1418,11 +1418,10 @@ function scoreOCRResult(
 
 /* =========================================
    CLEAN OCR
+   GENERAL PURPOSE
 ========================================= */
 
-function cleanOCRText(
-  text
-) {
+function cleanOCRText(text) {
 
   if (!text) {
     return "";
@@ -1451,6 +1450,10 @@ function cleanOCRText(
     );
 
 
+  /* =====================================
+     NORMALIZE SPACE
+  ===================================== */
+
   cleaned =
     cleaned.replace(
       /[ \t]+/g,
@@ -1459,7 +1462,7 @@ function cleanOCRText(
 
 
   /* =====================================
-     REMOVE GARBAGE SYMBOL LINES
+     REMOVE GARBAGE SYMBOL-ONLY LINES
   ===================================== */
 
   cleaned =
@@ -1470,17 +1473,15 @@ function cleanOCRText(
 
 
   /* =====================================
-     OCR WORD CORRECTION
+     COMMON THAI OCR CORRECTIONS
      
-     แก้เฉพาะคำที่ OCR มักอ่านผิด
-     และเป็นคำที่มีรูปแบบชัดเจน
+     แก้เฉพาะรูปแบบที่ OCR ผิดชัดเจน
+     ไม่ล็อกข้อความทั้งประโยค
   ===================================== */
 
   const corrections = [
 
-    /*
-     * ช่วยลด
-     */
+    /* ช่วยลด */
 
     {
       pattern:
@@ -1511,9 +1512,7 @@ function cleanOCRText(
     },
 
 
-    /*
-     * รีไซเคิลได้
-     */
+    /* รีไซเคิล */
 
     {
       pattern:
@@ -1551,23 +1550,31 @@ function cleanOCRText(
     },
 
 
-    /*
-     * โปรดรับประทานทันที
-     */
+    /* พลาสติก */
 
     {
       pattern:
-        /โปรดริบประทานทันที/g,
+        /ผลาสติก/g,
       replacement:
-        "โปรดรับประทานทันที"
+        "พลาสติก"
     },
 
     {
       pattern:
-        /โปรดรับประทานทันที/g,
+        /พลาสตก/g,
       replacement:
-        "โปรดรับประทานทันที"
+        "พลาสติก"
     },
+
+    {
+      pattern:
+        /พลาสตค/g,
+      replacement:
+        "พลาสติก"
+    },
+
+
+    /* รับประทาน */
 
     {
       pattern:
@@ -1581,65 +1588,13 @@ function cleanOCRText(
         /โปรดรบประทาน/g,
       replacement:
         "โปรดรับประทาน"
-    },
-
-
-    /*
-     * กล่องนี้
-     */
-
-    {
-      pattern:
-        /กล่องนีสามารถ/g,
-      replacement:
-        "กล่องนี้สามารถ"
-    },
-
-    {
-      pattern:
-        /กล่องนีช่วยลด/g,
-      replacement:
-        "กล่องนี้ช่วยลด"
-    },
-
-    {
-      pattern:
-        /กล่องนี้ช่วขลด/g,
-      replacement:
-        "กล่องนี้ช่วยลด"
-    },
-
-
-    /*
-     * การใช้พลาสติก
-     */
-
-    {
-      pattern:
-        /การใช้ผลาสติก/g,
-      replacement:
-        "การใช้พลาสติก"
-    },
-
-    {
-      pattern:
-        /การใช้พลาสตก/g,
-      replacement:
-        "การใช้พลาสติก"
-    },
-
-    {
-      pattern:
-        /การใช้พลาสตค/g,
-      replacement:
-        "การใช้พลาสติก"
     }
 
   ];
 
 
   corrections.forEach(
-    function (item) {
+    function(item) {
 
       cleaned =
         cleaned.replace(
@@ -1657,103 +1612,42 @@ function cleanOCRText(
 
   cleaned =
     cleaned.replace(
-      /^Ww$/gim,
+      /^\s*Ww\s*$/gim,
       ""
     );
 
 
   cleaned =
     cleaned.replace(
-      /^W$/gim,
+      /^\s*W\s*$/gim,
       ""
     );
 
 
   cleaned =
     cleaned.replace(
-      /^ww$/gim,
+      /^\s*ww\s*$/gim,
       ""
     );
 
 
   cleaned =
     cleaned.replace(
-      /^ศศ$/gim,
+      /^\s*ศศ\s*$/gim,
       ""
     );
 
 
   cleaned =
     cleaned.replace(
-      /^ศ$/gim,
+      /^\s*ศ\s*$/gim,
       ""
     );
 
 
   /* =====================================
-     ENGLISH PHRASE REPAIR
-     
-     รองรับกรณี OCR แยก
-     Recommended / ed for...
+     ENGLISH OCR CORRECTION
   ===================================== */
-
-  cleaned =
-    cleaned.replace(
-      /Recommended\s*\n\s*for\s+immediate\s+consumption/gi,
-      "Recommended for immediate consumption"
-    );
-
-
-  cleaned =
-    cleaned.replace(
-      /Recommend\s*\n\s*ed\s+for\s+immediate\s+consumption/gi,
-      "Recommended for immediate consumption"
-    );
-
-
-  cleaned =
-    cleaned.replace(
-      /Recommend\s*\n\s*ed\s+for/gi,
-      "Recommended for"
-    );
-
-
-  cleaned =
-    cleaned.replace(
-      /Recommend\s+ed\s+for/gi,
-      "Recommended for"
-    );
-
-
-  cleaned =
-    cleaned.replace(
-      /Recommend\s*\n\s*for\s+immediate/gi,
-      "Recommended for immediate"
-    );
-
-
-  /*
-   * กรณี OCR อ่านเฉพาะท้ายประโยค
-   */
-
-  cleaned =
-    cleaned.replace(
-      /(^|\n)ed\s+for\s+immediate\s+consumption\s*\)\.?/gi,
-      "$1(Recommended for immediate consumption)."
-    );
-
-
-  cleaned =
-    cleaned.replace(
-      /(^|\n)ed\s+for\s+immediate\s+consumption/gi,
-      "$1Recommended for immediate consumption"
-    );
-
-
-  /*
-   * กรณีมี Recommend อยู่บรรทัดหนึ่ง
-   * และท้ายประโยคอยู่อีกบรรทัด
-   */
 
   cleaned =
     cleaned.replace(
@@ -1764,98 +1658,200 @@ function cleanOCRText(
 
   cleaned =
     cleaned.replace(
-      /Recommended\s+for\s+immediate\s+consumption\s*\)/gi,
-      "Recommended for immediate consumption)"
-    );
-
-
-  /* =====================================
-     REMOVE BROKEN PUNCTUATION SPACING
-  ===================================== */
-
-  cleaned =
-    cleaned.replace(
-      /\s+([.,!?;:)])/g,
-      "$1"
+      /Recommend\s+ed/gi,
+      "Recommended"
     );
 
 
   cleaned =
     cleaned.replace(
-      /([(])\s+/g,
-      "$1"
+      /Recommended\s*\n\s*for/gi,
+      "Recommended for"
+    );
+
+
+  cleaned =
+    cleaned.replace(
+      /Recommend\s*\n\s*for/gi,
+      "Recommended for"
+    );
+
+
+  cleaned =
+    cleaned.replace(
+      /ed\s+for\s+immediate\s+consumption/gi,
+      "Recommended for immediate consumption"
+    );
+
+
+  cleaned =
+    cleaned.replace(
+      /ed\s*\n\s*for\s+immediate\s+consumption/gi,
+      "Recommended for immediate consumption"
     );
 
 
   /* =====================================
-     SPLIT INTO LINES
+     SPLIT LINES
   ===================================== */
 
   let lines =
     cleaned
       .split("\n")
       .map(
-        function (line) {
+        function(line) {
 
           return line.trim();
 
         }
       )
       .filter(
-        function (line) {
+        function(line) {
 
-          if (!line) {
-            return false;
-          }
-
-
-          const useful =
-            line.match(
-              /[ก-๙a-zA-Z0-9]/g
-            );
-
-
-          const count =
-            useful
-              ? useful.length
-              : 0;
-
-
-          /*
-           * ลบเศษที่ไม่มีตัวอักษร
-           */
-
-          if (
-            count === 0
-          ) {
-
-            return false;
-
-          }
-
-
-          /*
-           * ลบเศษสั้นมาก
-           */
-
-          if (
-            count === 1 &&
-            line.length <= 3
-          ) {
-
-            return false;
-
-          }
-
-
-          return true;
+          return line.length > 0;
 
         }
       );
 
 
   /* =====================================
-     MERGE BROKEN ENGLISH LINES
+     REMOVE GARBAGE LINES
+  ===================================== */
+
+  lines =
+    lines.filter(
+      function(line) {
+
+        if (!line) {
+          return false;
+        }
+
+
+        if (
+          /^Ww$/i.test(line) ||
+          /^W$/i.test(line) ||
+          /^ww$/i.test(line) ||
+          /^ศศ$/.test(line) ||
+          /^ศ$/.test(line)
+        ) {
+
+          return false;
+
+        }
+
+
+        const useful =
+          line.match(
+            /[ก-๙a-zA-Z0-9]/g
+          );
+
+
+        const count =
+          useful
+            ? useful.length
+            : 0;
+
+
+        if (
+          count === 0
+        ) {
+
+          return false;
+
+        }
+
+
+        /*
+         * ไม่ลบคำสั้นทั่วไป
+         * เพื่อให้รองรับ OCR ที่มีคำสั้น เช่น
+         * "ไป", "มา", "OK", "Hi"
+         */
+
+        return true;
+
+      }
+    );
+
+
+  /* =====================================
+     CORRECT EACH LINE AGAIN
+  ===================================== */
+
+  lines =
+    lines.map(
+      function(line) {
+
+        line =
+          line.replace(
+            /ช่วขลด/g,
+            "ช่วยลด"
+          );
+
+
+        line =
+          line.replace(
+            /ชว่ยลด/g,
+            "ช่วยลด"
+          );
+
+
+        line =
+          line.replace(
+            /ชว่ขลด/g,
+            "ช่วยลด"
+          );
+
+
+        line =
+          line.replace(
+            /ธีไซเคิลไล้/g,
+            "รีไซเคิลได้"
+          );
+
+
+        line =
+          line.replace(
+            /ธีไซเคิลได้/g,
+            "รีไซเคิลได้"
+          );
+
+
+        line =
+          line.replace(
+            /รีไซเคิลไล้/g,
+            "รีไซเคิลได้"
+          );
+
+
+        line =
+          line.replace(
+            /ผลาสติก/g,
+            "พลาสติก"
+          );
+
+
+        line =
+          line.replace(
+            /โปรดริบประทาน/g,
+            "โปรดรับประทาน"
+          );
+
+
+        line =
+          line.replace(
+            /โปรดรบประทาน/g,
+            "โปรดรับประทาน"
+          );
+
+
+        return line.trim();
+
+      }
+    );
+
+
+  /* =====================================
+     MERGE BROKEN ENGLISH
   ===================================== */
 
   const mergedLines = [];
@@ -1870,30 +1866,8 @@ function cleanOCRText(
     const current =
       lines[i];
 
-
     const next =
       lines[i + 1] || "";
-
-
-    /*
-     * ed + for
-     */
-
-    if (
-      /^ed$/i.test(current) &&
-      /^for\s+/i.test(next)
-    ) {
-
-      mergedLines.push(
-        "Recommended " +
-        next
-      );
-
-      i++;
-
-      continue;
-
-    }
 
 
     /*
@@ -1918,7 +1892,28 @@ function cleanOCRText(
 
 
     /*
-     * Recommended + for...
+     * ed + for
+     */
+
+    if (
+      /^ed$/i.test(current) &&
+      /^for\s+/i.test(next)
+    ) {
+
+      mergedLines.push(
+        "Recommended " +
+        next
+      );
+
+      i++;
+
+      continue;
+
+    }
+
+
+    /*
+     * Recommended + for
      */
 
     if (
@@ -1951,60 +1946,28 @@ function cleanOCRText(
 
 
   /* =====================================
-     FINAL ENGLISH PHRASE COMBINATION
+     FINAL TEXT CLEANUP
   ===================================== */
 
-  const finalLines = [];
-
-
-  for (
-    let i = 0;
-    i < lines.length;
-    i++
-  ) {
-
-    const line =
-      lines[i];
-
-
-    const next =
-      lines[i + 1] || "";
-
-
-    if (
-      /โปรดรับประทานทันที/i.test(line) &&
-      /Recommended/i.test(next)
-    ) {
-
-      finalLines.push(
-        line +
-        " " +
-        next
-      );
-
-      i++;
-
-      continue;
-
-    }
-
-
-    finalLines.push(
-      line
-    );
-
-  }
-
-
   cleaned =
-    finalLines.join(
+    lines.join(
       "\n"
     );
 
 
-  /* =====================================
-     FINAL NORMALIZATION
-  ===================================== */
+  cleaned =
+    cleaned.replace(
+      /\s+([.,!?;:)])/g,
+      "$1"
+    );
+
+
+  cleaned =
+    cleaned.replace(
+      /([(])\s+/g,
+      "$1"
+    );
+
 
   cleaned =
     cleaned.replace(
@@ -3026,5 +2989,5 @@ resultText.classList.add(
 
 
 console.log(
-  "🌐 ผู้ช่วยแปลภาษา + OCR Correction พร้อมใช้งาน"
+  "🌐 ผู้ช่วยแปลภาษา + General OCR Correction พร้อมใช้งาน"
 );
