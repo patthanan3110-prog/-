@@ -3,17 +3,18 @@
    Thai ↔ English
    OCR + Translation
 
-   VERSION 43
+   VERSION 44
 
    OCR:
    - Thai / English แยก Worker
-   - OCR แบบแยกพื้นที่ภาษา
-   - ป้องกัน Thai OCR อ่านตัว English
-   - ป้องกัน English OCR อ่านตัว Thai
+   - ไม่ใช้ OCR ของภาษาหนึ่งไปบังอีกภาษา
+   - ให้ Thai และ English อ่านภาพเต็มแยกกัน
+   - ป้องกัน English hallucination จากตัวอักษรไทย
+   - ป้องกัน Thai hallucination จากตัวอักษรอังกฤษ
    - ใช้ตำแหน่งจริงของข้อความ
-   - ใช้ตำแหน่งแบบสัดส่วนเพื่อรวม OCR ต่างขนาด
-   - ลด OCR hallucination
-   - ป้องกันข้อความจริงถูกตัดทิ้งจากการ OCR หลายรอบ
+   - ใช้ normalized coordinates
+   - รวม OCR จากหลายขนาดภาพ
+   - ลดการตัดข้อความจริงทิ้ง
 ========================================================= */
 
 
@@ -944,134 +945,6 @@ function createEnhancedCanvas(
 
 
 /* =========================================================
-   MASK REGIONS
-========================================================= */
-
-function createMaskedCanvas(
-  sourceCanvas,
-  regions,
-  padding = 12
-) {
-
-  const canvas =
-    document.createElement(
-      "canvas"
-    );
-
-  canvas.width =
-    sourceCanvas.width;
-
-  canvas.height =
-    sourceCanvas.height;
-
-  const ctx =
-    canvas.getContext(
-      "2d",
-      {
-        willReadFrequently:
-          true
-      }
-    );
-
-  if (!ctx)
-    return sourceCanvas;
-
-  ctx.drawImage(
-    sourceCanvas,
-    0,
-    0
-  );
-
-  ctx.fillStyle =
-    "#ffffff";
-
-  for (
-    const region
-    of regions || []
-  ) {
-
-    /*
-      ใช้พิกัดจริงของ canvas
-      เพราะ mask เกิดภายใน pass เดียวกัน
-    */
-
-    const x =
-      Math.max(
-        0,
-        Math.floor(
-          Number(
-            region.x || 0
-          ) -
-          padding
-        )
-      );
-
-    const y =
-      Math.max(
-        0,
-        Math.floor(
-          Number(
-            region.y || 0
-          ) -
-          padding
-        )
-      );
-
-    const right =
-      Math.min(
-        canvas.width,
-        Math.ceil(
-          Number(
-            region.x || 0
-          ) +
-          Number(
-            region.width || 0
-          ) +
-          padding
-        )
-      );
-
-    const bottom =
-      Math.min(
-        canvas.height,
-        Math.ceil(
-          Number(
-            region.y || 0
-          ) +
-          Number(
-            region.height || 0
-          ) +
-          padding
-        )
-      );
-
-    const width =
-      Math.max(
-        1,
-        right - x
-      );
-
-    const height =
-      Math.max(
-        1,
-        bottom - y
-      );
-
-    ctx.fillRect(
-      x,
-      y,
-      width,
-      height
-    );
-
-  }
-
-  return canvas;
-
-}
-
-
-/* =========================================================
    TEXT
 ========================================================= */
 
@@ -1235,7 +1108,7 @@ function getLanguageRatio(text) {
 
 
 /* =========================================================
-   GIBBERISH
+   ENGLISH HALLUCINATION FILTER
 ========================================================= */
 
 function looksLikeEnglishGibberish(
@@ -1253,7 +1126,7 @@ function looksLikeEnglishGibberish(
   const letters =
     countEnglish(value);
 
-  if (letters < 4)
+  if (letters < 3)
     return false;
 
   const words =
@@ -1261,12 +1134,174 @@ function looksLikeEnglishGibberish(
       .split(/\s+/)
       .filter(Boolean);
 
-  if (words.length >= 2)
-    return false;
+  /*
+    OCR ภาษาไทยมักถูก English Worker
+    อ่านออกมาเป็นคำยาว ๆ ที่มี
+    ตัวพิมพ์ใหญ่แทรกผิดธรรมชาติ เช่น
+
+    AfuAULGEI
+    RosdrewkaadAtuavla
+  */
+
+  const pureWords =
+    words.map(
+      word =>
+        word.replace(
+          /[^a-zA-Z]/g,
+          ""
+        )
+    ).filter(Boolean);
+
+  for (
+    const word
+    of pureWords
+  ) {
+
+    if (
+      word.length >= 7
+    ) {
+
+      const uppercase =
+        (
+          word.match(
+            /[A-Z]/g
+          ) || []
+        ).length;
+
+      const lowercase =
+        (
+          word.match(
+            /[a-z]/g
+          ) || []
+        ).length;
+
+      /*
+        คำภาษาอังกฤษปกติ
+        ไม่ควรมีตัวใหญ่แทรกหลายตัว
+      */
+
+      if (
+        uppercase >= 3 &&
+        lowercase >= 2
+      )
+        return true;
+
+      /*
+        ตัวใหญ่สลับกลางคำ
+        เช่น AbCdEfGh
+      */
+
+      if (
+        /[a-z][A-Z][a-z][A-Z]/.test(
+          word
+        )
+      )
+        return true;
+
+    }
+
+    /*
+      คำยาวมากแต่ไม่มีสระ
+      มักเป็น OCR noise
+    */
+
+    if (
+      word.length >= 12
+    ) {
+
+      const vowels =
+        (
+          word.match(
+            /[aeiouy]/gi
+          ) || []
+        ).length;
+
+      if (
+        vowels === 0
+      )
+        return true;
+
+      if (
+        vowels /
+          word.length <
+          0.16
+      )
+        return true;
+
+    }
+
+  }
+
+
+  /*
+    ตัวอักษรและเครื่องหมาย
+    แปลกผิดธรรมชาติ
+  */
+
+  const strange =
+    (
+      value.match(
+        /[^a-zA-Z0-9\s.,!?'"’‘:;()\-]/g
+      ) || []
+    ).length;
+
+  if (
+    strange >= 2 &&
+    strange >=
+      letters * 0.12
+  )
+    return true;
+
+
+  /*
+    ตัวเลขเยอะผิดปกติ
+  */
+
+  const digits =
+    countDigits(value);
+
+  if (
+    digits >= 5 &&
+    digits > letters * 0.45
+  )
+    return true;
+
+
+  /*
+    ตัวอักษรตัวใหญ่เยอะผิดธรรมชาติ
+    สำหรับข้อความยาว
+  */
+
+  if (
+    letters >= 10
+  ) {
+
+    const uppercaseTotal =
+      (
+        value.match(
+          /[A-Z]/g
+        ) || []
+      ).length;
+
+    if (
+      uppercaseTotal >= 5 &&
+      uppercaseTotal /
+        letters >
+        0.45
+    )
+      return true;
+
+  }
+
+
+  /*
+    คำเดี่ยวที่ยาวมาก
+    และไม่ใช่รูปแบบภาษาอังกฤษทั่วไป
+  */
 
   if (
     words.length === 1 &&
-    letters >= 16
+    letters >= 18
   ) {
 
     const word =
@@ -1282,17 +1317,23 @@ function looksLikeEnglishGibberish(
         ) || []
       ).length;
 
-    if (!vowels)
+    if (
+      vowels === 0
+    )
       return true;
 
     if (
-      letters >= 19 &&
-      vowels / letters <
+      vowels /
+        Math.max(
+          1,
+          word.length
+        ) <
         0.20
     )
       return true;
 
   }
+
 
   if (
     /(.)\1{5,}/i.test(
@@ -1301,10 +1342,15 @@ function looksLikeEnglishGibberish(
   )
     return true;
 
+
   return false;
 
 }
 
+
+/* =========================================================
+   THAI HALLUCINATION FILTER
+========================================================= */
 
 function looksLikeThaiGibberish(
   text
@@ -1359,6 +1405,10 @@ function looksLikeThaiGibberish(
 
 }
 
+
+/* =========================================================
+   GENERAL OCR NOISE
+========================================================= */
 
 function looksLikeOCRNoise(text) {
 
@@ -1619,7 +1669,6 @@ function getWordConfidence(
 
 /* =========================================================
    EXTRACT LINES
-   เพิ่ม normalized coordinates
 ========================================================= */
 
 function extractOCRLines(
@@ -1681,16 +1730,21 @@ function extractOCRLines(
 
     if (
       language === "th"
-    )
+    ) {
+
       text =
         normalizeThaiText(
           text
         );
-    else
+
+    } else {
+
       text =
         normalizeEnglishText(
           text
         );
+
+    }
 
     if (!text)
       continue;
@@ -1720,12 +1774,38 @@ function extractOCRLines(
 
     }
 
+
+    /*
+      สำคัญมาก:
+      กรอง English hallucination
+      ก่อนเข้า candidate pool
+    */
+
+    if (
+      language === "en" &&
+      looksLikeEnglishGibberish(
+        text
+      )
+    )
+      continue;
+
+
+    if (
+      language === "th" &&
+      looksLikeThaiGibberish(
+        text
+      )
+    )
+      continue;
+
+
     if (
       looksLikeOCRNoise(
         text
       )
     )
       continue;
+
 
     const bbox =
       line.bbox || {};
@@ -1793,21 +1873,10 @@ function extractOCRLines(
           ? wordConfidence
           : confidence,
 
-      /*
-        พิกัดจริง
-        ใช้สำหรับ mask
-      */
-
       x,
       y,
       width,
       height,
-
-      /*
-        พิกัดแบบสัดส่วน
-        ใช้สำหรับเปรียบเทียบ
-        OCR จากภาพคนละขนาด
-      */
 
       nx:
         x / canvasWidth,
@@ -1941,12 +2010,6 @@ function sameTextRegion(
       lineCenterY(a) -
       lineCenterY(b)
     );
-
-  /*
-    ถ้าเป็นภาพคนละ scale
-    ใช้ normalized coordinate
-    จึงสามารถเทียบตำแหน่งได้
-  */
 
   if (
     verticalDistance >
@@ -2259,26 +2322,6 @@ function chooseBestFromGroup(
         )
           score += 5;
 
-        /*
-          ถ้ามีหลาย pass สนับสนุน
-          ให้ความสำคัญมากขึ้น
-        */
-
-        if (
-          candidate.passIndex
-        ) {
-
-          score +=
-            Math.min(
-              4,
-              Number(
-                candidate.support ||
-                0
-              )
-            );
-
-        }
-
         return {
 
           candidate,
@@ -2392,14 +2435,6 @@ function selectFinalLines(
         best.support || 1
       );
 
-    /*
-      Version 43:
-      ลดการตัดข้อความจริงทิ้ง
-
-      ถ้า confidence สูง
-      ให้รับได้แม้มีแค่ 1 pass
-    */
-
     if (
       support >= 2 &&
       quality >= 42
@@ -2415,7 +2450,7 @@ function selectFinalLines(
 
     if (
       support === 1 &&
-      quality >= 68
+      quality >= 65
     ) {
 
       selected.push(
@@ -2468,6 +2503,44 @@ function selectFinalLines(
         getLineQuality(
           candidate
         );
+
+      /*
+        ถ้าสองภาษาอยู่พื้นที่เดียวกัน
+        ไม่ให้ English hallucination
+        แย่งข้อความ Thai ที่มีคุณภาพดี
+      */
+
+      if (
+        old.language === "th" &&
+        candidate.language === "en" &&
+        newQuality <
+          oldQuality + 8
+      ) {
+
+        discarded =
+          true;
+
+        break;
+
+      }
+
+      if (
+        old.language === "en" &&
+        candidate.language === "th" &&
+        oldQuality <
+          newQuality + 8
+      ) {
+
+        final.splice(
+          i,
+          1
+        );
+
+        i--;
+
+        continue;
+
+      }
 
       const oldLength =
         old.text
@@ -2833,6 +2906,14 @@ async function recognizeOCR(
 
 /* =========================================================
    LANGUAGE-SEPARATED OCR
+   VERSION 44
+
+   สำคัญ:
+   ไม่ mask อีกภาษาแล้ว
+
+   เพราะ Version 43 มีปัญหา:
+   English OCR อ่านภาษาไทยผิด
+   แล้วเอาพื้นที่นั้นไปบัง Thai OCR
 ========================================================= */
 
 async function runSeparatedOCRPass(
@@ -2843,7 +2924,27 @@ async function runSeparatedOCRPass(
 ) {
 
   /*
-    1. อ่านอังกฤษจากภาพเต็ม
+    อ่านภาษาไทยจากภาพเต็ม
+  */
+
+  const thaiData =
+    await recognizeOCR(
+      workers.thaiWorker,
+      canvas,
+      psm
+    );
+
+  const thaiLines =
+    extractOCRLines(
+      thaiData,
+      "th",
+      passIndex,
+      canvas
+    );
+
+
+  /*
+    อ่านภาษาอังกฤษจากภาพเต็ม
   */
 
   const englishData =
@@ -2863,139 +2964,14 @@ async function runSeparatedOCRPass(
 
 
   /*
-    2. ปิดเฉพาะพื้นที่อังกฤษ
+    ส่งกลับทั้งสองภาษา
+    แล้วให้ระบบกลางเป็นคนตัดสิน
+    ว่าอะไรเป็นข้อความจริง
   */
-
-  const thaiCanvas =
-    createMaskedCanvas(
-      canvas,
-      englishLines,
-      14
-    );
-
-
-  /*
-    3. อ่านไทยจากพื้นที่ที่เหลือ
-  */
-
-  const thaiData =
-    await recognizeOCR(
-      workers.thaiWorker,
-      thaiCanvas,
-      psm
-    );
-
-  const thaiLines =
-    extractOCRLines(
-      thaiData,
-      "th",
-      passIndex,
-      canvas
-    );
-
-
-  /*
-    4. ไม่รับ Thai ที่ทับ
-       ตำแหน่งอังกฤษ
-  */
-
-  const cleanThaiLines =
-    thaiLines.filter(
-      thaiLine => {
-
-        for (
-          const englishLine
-          of englishLines
-        ) {
-
-          if (
-            sameTextRegion(
-              thaiLine,
-              englishLine
-            )
-          ) {
-
-            return false;
-
-          }
-
-        }
-
-        return true;
-
-      }
-    );
-
-
-  /*
-    5. ปิดพื้นที่ไทย
-  */
-
-  const thaiMaskCanvas =
-    createMaskedCanvas(
-      canvas,
-      cleanThaiLines,
-      14
-    );
-
-
-  /*
-    6. อ่านอังกฤษซ้ำ
-       เพื่อไม่ให้พลาดข้อความ
-  */
-
-  const englishSecondData =
-    await recognizeOCR(
-      workers.englishWorker,
-      thaiMaskCanvas,
-      psm
-    );
-
-  const englishSecondLines =
-    extractOCRLines(
-      englishSecondData,
-      "en",
-      passIndex,
-      thaiMaskCanvas
-    );
-
-
-  /*
-    7. รวม English
-  */
-
-  const allEnglish = [
-    ...englishLines
-  ];
-
-  for (
-    const line
-    of englishSecondLines
-  ) {
-
-    const duplicate =
-      allEnglish.some(
-        old =>
-          sameTextRegion(
-            old,
-            line
-          ) &&
-          lineSimilarity(
-            old.text,
-            line.text
-          ) >= 0.55
-      );
-
-    if (!duplicate)
-      allEnglish.push(
-        line
-      );
-
-  }
 
   return [
-    ...cleanThaiLines,
-    ...allEnglish
+    ...thaiLines,
+    ...englishLines
   ];
 
 }
@@ -3045,8 +3021,8 @@ async function runOCR(
 
     showLoading(
       fromCamera
-        ? "กำลังแยกภาษาและอ่านข้อความจากกล้อง..."
-        : "กำลังแยกภาษาและอ่านข้อความจากรูป..."
+        ? "กำลังอ่านภาษาไทยและอังกฤษจากกล้อง..."
+        : "กำลังอ่านภาษาไทยและอังกฤษจากรูป..."
     );
 
     const normalCanvas =
@@ -3073,7 +3049,7 @@ async function runOCR(
     ===================================================== */
 
     showLoading(
-      "กำลังอ่านซ้ำโดยแยกพื้นที่ภาษา..."
+      "กำลังอ่านซ้ำด้วยภาพขยาย..."
     );
 
     const enlargedCanvas =
@@ -4159,5 +4135,5 @@ window.addEventListener(
 
 
 /* =========================================================
-   VERSION 43 END
+   VERSION 44 END
 ========================================================= */
