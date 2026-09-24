@@ -2,7 +2,7 @@
    ผู้ช่วยแปลภาษา
    Thai ↔ English
    OCR + Translation
-   VERSION 14
+   VERSION 15
 ========================================================= */
 
 const API_URL =
@@ -33,7 +33,8 @@ let isOCRRunning = false;
    DOM
 ========================================================= */
 
-const inputText = document.getElementById("inputText");
+const inputText =
+  document.getElementById("inputText");
 
 const cameraButton =
   document.getElementById("cameraButton");
@@ -103,20 +104,34 @@ const targetLanguageText =
 
 
 /* =========================================================
-   LANGUAGE
+   LANGUAGE UI
 ========================================================= */
 
 function updateLanguageUI() {
 
   if (sourceLanguage === "th") {
 
-    sourceLanguageText.textContent = "ภาษาไทย";
-    targetLanguageText.textContent = "English";
+    if (sourceLanguageText) {
+      sourceLanguageText.textContent =
+        "ภาษาไทย";
+    }
+
+    if (targetLanguageText) {
+      targetLanguageText.textContent =
+        "English";
+    }
 
   } else {
 
-    sourceLanguageText.textContent = "English";
-    targetLanguageText.textContent = "ภาษาไทย";
+    if (sourceLanguageText) {
+      sourceLanguageText.textContent =
+        "English";
+    }
+
+    if (targetLanguageText) {
+      targetLanguageText.textContent =
+        "ภาษาไทย";
+    }
 
   }
 
@@ -127,15 +142,21 @@ function updateLanguageUI() {
    STATUS
 ========================================================= */
 
-function showStatus(message, type = "info") {
+function showStatus(
+  message,
+  type = "info"
+) {
 
   if (!statusMessage) return;
 
-  statusMessage.textContent = message;
+  statusMessage.textContent =
+    message;
+
   statusMessage.className =
     "status-message " + type;
 
-  statusMessage.hidden = false;
+  statusMessage.hidden =
+    false;
 
 }
 
@@ -144,7 +165,8 @@ function hideStatus() {
 
   if (!statusMessage) return;
 
-  statusMessage.hidden = true;
+  statusMessage.hidden =
+    true;
 
 }
 
@@ -156,11 +178,17 @@ function hideStatus() {
 function showLoading(message) {
 
   if (loadingText) {
-    loadingText.textContent = message;
+
+    loadingText.textContent =
+      message;
+
   }
 
   if (loadingBox) {
-    loadingBox.hidden = false;
+
+    loadingBox.hidden =
+      false;
+
   }
 
 }
@@ -169,7 +197,10 @@ function showLoading(message) {
 function hideLoading() {
 
   if (loadingBox) {
-    loadingBox.hidden = true;
+
+    loadingBox.hidden =
+      true;
+
   }
 
 }
@@ -182,66 +213,122 @@ function hideLoading() {
 function loadTesseract() {
 
   if (window.Tesseract) {
-    return Promise.resolve(window.Tesseract);
+
+    return Promise.resolve(
+      window.Tesseract
+    );
+
   }
 
   if (tesseractLoading) {
+
     return tesseractLoading;
+
   }
 
-  tesseractLoading = new Promise((resolve, reject) => {
+  tesseractLoading =
+    new Promise(
+      (resolve, reject) => {
 
-    const existing =
-      document.querySelector(
-        `script[src="${TESSERACT_URL}"]`
-      );
+        const existing =
+          document.querySelector(
+            `script[src="${TESSERACT_URL}"]`
+          );
 
-    if (existing) {
+        if (existing) {
 
-      existing.addEventListener(
-        "load",
-        () => resolve(window.Tesseract)
-      );
+          existing.addEventListener(
+            "load",
+            () => {
 
-      existing.addEventListener(
-        "error",
-        reject
-      );
+              if (window.Tesseract) {
+                resolve(
+                  window.Tesseract
+                );
+              } else {
+                reject(
+                  new Error(
+                    "ไม่พบ Tesseract.js"
+                  )
+                );
+              }
 
-      return;
-    }
+            }
+          );
 
-    const script =
-      document.createElement("script");
+          existing.addEventListener(
+            "error",
+            () => {
 
-    script.src = TESSERACT_URL;
-    script.async = true;
+              reject(
+                new Error(
+                  "โหลดระบบ OCR ไม่สำเร็จ"
+                )
+              );
 
-    script.onload = () => {
+            }
+          );
 
-      if (window.Tesseract) {
-        resolve(window.Tesseract);
-      } else {
-        reject(
-          new Error("ไม่พบ Tesseract.js")
+          return;
+
+        }
+
+
+        const script =
+          document.createElement(
+            "script"
+          );
+
+        script.src =
+          TESSERACT_URL;
+
+        script.async =
+          true;
+
+
+        script.onload =
+          () => {
+
+            if (window.Tesseract) {
+
+              resolve(
+                window.Tesseract
+              );
+
+            } else {
+
+              reject(
+                new Error(
+                  "ไม่พบ Tesseract.js"
+                )
+              );
+
+            }
+
+          };
+
+
+        script.onerror =
+          () => {
+
+            reject(
+              new Error(
+                "โหลดระบบ OCR ไม่สำเร็จ"
+              )
+            );
+
+          };
+
+
+        document.head.appendChild(
+          script
         );
+
       }
-
-    };
-
-    script.onerror = () => {
-
-      reject(
-        new Error("โหลดระบบ OCR ไม่สำเร็จ")
-      );
-
-    };
-
-    document.head.appendChild(script);
-
-  });
+    );
 
   return tesseractLoading;
+
 }
 
 
@@ -252,29 +339,37 @@ function loadTesseract() {
 async function getOCRWorker() {
 
   if (tesseractWorker) {
+
     return tesseractWorker;
+
   }
 
   const Tesseract =
     await loadTesseract();
 
-  showLoading("กำลังเตรียมระบบอ่านตัวอักษร...");
+  showLoading(
+    "กำลังเตรียมระบบอ่านตัวอักษร..."
+  );
+
 
   tesseractWorker =
     await Tesseract.createWorker(
       "tha+eng",
       1,
       {
+
         logger: message => {
 
           if (
             message &&
-            message.status === "recognizing text"
+            message.status ===
+              "recognizing text"
           ) {
 
             const progress =
               Math.round(
-                (message.progress || 0) * 100
+                (message.progress || 0) *
+                  100
               );
 
             if (loadingText) {
@@ -287,35 +382,46 @@ async function getOCRWorker() {
           }
 
         }
+
       }
     );
 
+
   await tesseractWorker.setParameters({
 
-    preserve_interword_spaces: "1",
+    preserve_interword_spaces:
+      "1",
 
-    user_defined_dpi: "300"
+    user_defined_dpi:
+      "300"
 
   });
 
+
   return tesseractWorker;
+
 }
 
 
 /* =========================================================
    IMAGE FILE
-   IMPORTANT:
-   - ไม่แก้ไฟล์ต้นฉบับ
-   - ไม่หมุนรูปเอง
-   - ไม่เปลี่ยนสัดส่วน
-   - ไม่บีบภาพ
+   รูปที่ผู้ใช้เลือก:
+   - ใช้ไฟล์ต้นฉบับ
+   - ไม่หมุน
+   - ไม่ crop
+   - ไม่ยืด
+   - ไม่บีบเพื่อแสดงผล
 ========================================================= */
 
 function handleImageFile(file) {
 
   if (!file) return;
 
-  if (!file.type.startsWith("image/")) {
+
+  if (
+    !file.type ||
+    !file.type.startsWith("image/")
+  ) {
 
     showStatus(
       "กรุณาเลือกไฟล์รูปภาพ",
@@ -323,13 +429,13 @@ function handleImageFile(file) {
     );
 
     return;
+
   }
 
-  selectedImageFile = file;
 
-  /*
-    revoke URL เก่า
-  */
+  selectedImageFile =
+    file;
+
 
   if (selectedImageUrl) {
 
@@ -339,12 +445,16 @@ function handleImageFile(file) {
 
   }
 
+
   selectedImageUrl =
-    URL.createObjectURL(file);
+    URL.createObjectURL(
+      file
+    );
+
 
   /*
-    ใช้ไฟล์ต้นฉบับแสดง preview
-    ไม่มีการ resize / crop / rotate
+    Preview ใช้ไฟล์จริงโดยตรง
+    ไม่ผ่าน canvas
   */
 
   if (imagePreview) {
@@ -354,6 +464,7 @@ function handleImageFile(file) {
 
   }
 
+
   if (imagePreviewContainer) {
 
     imagePreviewContainer.hidden =
@@ -361,8 +472,9 @@ function handleImageFile(file) {
 
   }
 
+
   /*
-    เปิด OCR อัตโนมัติ
+    OCR
   */
 
   runOCR(file);
@@ -371,7 +483,7 @@ function handleImageFile(file) {
 
 
 /* =========================================================
-   CAMERA
+   CAMERA BUTTON
 ========================================================= */
 
 if (cameraButton) {
@@ -380,13 +492,12 @@ if (cameraButton) {
     "click",
     () => {
 
-      if (cameraInput) {
+      if (!cameraInput) return;
 
-        cameraInput.value = "";
+      cameraInput.value =
+        "";
 
-        cameraInput.click();
-
-      }
+      cameraInput.click();
 
     }
   );
@@ -395,7 +506,7 @@ if (cameraButton) {
 
 
 /* =========================================================
-   GALLERY
+   GALLERY BUTTON
 ========================================================= */
 
 if (galleryButton) {
@@ -404,13 +515,12 @@ if (galleryButton) {
     "click",
     () => {
 
-      if (galleryInput) {
+      if (!galleryInput) return;
 
-        galleryInput.value = "";
+      galleryInput.value =
+        "";
 
-        galleryInput.click();
-
-      }
+      galleryInput.click();
 
     }
   );
@@ -428,15 +538,16 @@ if (cameraInput) {
     "change",
     event => {
 
-      const file =
-        event.target.files &&
-        event.target.files[0];
+      const files =
+        event.target.files;
 
-      if (file) {
-
-        handleImageFile(file);
-
+      if (!files || !files.length) {
+        return;
       }
+
+      handleImageFile(
+        files[0]
+      );
 
     }
   );
@@ -454,15 +565,16 @@ if (galleryInput) {
     "change",
     event => {
 
-      const file =
-        event.target.files &&
-        event.target.files[0];
+      const files =
+        event.target.files;
 
-      if (file) {
-
-        handleImageFile(file);
-
+      if (!files || !files.length) {
+        return;
       }
+
+      handleImageFile(
+        files[0]
+      );
 
     }
   );
@@ -488,14 +600,22 @@ if (removeImageButton) {
 
       }
 
-      selectedImageUrl = null;
-      selectedImageFile = null;
+
+      selectedImageUrl =
+        null;
+
+      selectedImageFile =
+        null;
+
 
       if (imagePreview) {
 
-        imagePreview.removeAttribute("src");
+        imagePreview.removeAttribute(
+          "src"
+        );
 
       }
+
 
       if (imagePreviewContainer) {
 
@@ -504,21 +624,38 @@ if (removeImageButton) {
 
       }
 
+
       if (cameraInput) {
-        cameraInput.value = "";
+
+        cameraInput.value =
+          "";
+
       }
+
 
       if (galleryInput) {
-        galleryInput.value = "";
+
+        galleryInput.value =
+          "";
+
       }
+
 
       if (ocrText) {
-        ocrText.value = "";
+
+        ocrText.value =
+          "";
+
       }
 
+
       if (ocrCard) {
-        ocrCard.hidden = true;
+
+        ocrCard.hidden =
+          true;
+
       }
+
 
       hideStatus();
 
@@ -529,25 +666,91 @@ if (removeImageButton) {
 
 
 /* =========================================================
-   CREATE OCR IMAGE
-   - ใช้ภาพต้นฉบับเป็นหลัก
-   - จำกัดขนาดเพื่อความเร็ว
-   - รักษาสัดส่วนเดิม
-   - ไม่ crop
+   LOAD IMAGE FOR OCR
+   สำเนานี้ใช้เฉพาะ OCR
+   รูปต้นฉบับของผู้ใช้ไม่ถูกแก้
 ========================================================= */
 
-async function prepareOCRImage(file) {
+function loadImage(file) {
+
+  return new Promise(
+    (resolve, reject) => {
+
+      const url =
+        URL.createObjectURL(
+          file
+        );
+
+      const img =
+        new Image();
+
+
+      img.onload =
+        () => {
+
+          URL.revokeObjectURL(
+            url
+          );
+
+          resolve(img);
+
+        };
+
+
+      img.onerror =
+        () => {
+
+          URL.revokeObjectURL(
+            url
+          );
+
+          reject(
+            new Error(
+              "ไม่สามารถเปิดรูปภาพได้"
+            )
+          );
+
+        };
+
+
+      img.src =
+        url;
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   PREPARE OCR IMAGE
+   - รักษาสัดส่วน
+   - ไม่ crop
+   - ไม่ rotate
+   - ลดขนาดเฉพาะสำเนา OCR
+========================================================= */
+
+async function prepareOCRImage(
+  file
+) {
 
   const img =
     await loadImage(file);
 
-  let width =
-    img.naturalWidth || img.width;
 
-  let height =
-    img.naturalHeight || img.height;
+  const originalWidth =
+    img.naturalWidth ||
+    img.width;
 
-  if (!width || !height) {
+  const originalHeight =
+    img.naturalHeight ||
+    img.height;
+
+
+  if (
+    !originalWidth ||
+    !originalHeight
+  ) {
 
     throw new Error(
       "ไม่สามารถอ่านขนาดรูปภาพได้"
@@ -555,53 +758,73 @@ async function prepareOCRImage(file) {
 
   }
 
+
   /*
-    ถ้ารูปใหญ่มาก ให้ลดเฉพาะสำเนาที่ใช้ OCR
-    รูปต้นฉบับยังไม่ถูกแก้
+    ขนาด OCR สูงสุด
+    ลดจาก 3600 เพื่อให้เร็วขึ้น
   */
 
-  const MAX_SIZE = 2600;
+  const MAX_SIZE =
+    2600;
 
-  let scale = 1;
+
+  let scale =
+    1;
+
 
   if (
-    width > MAX_SIZE ||
-    height > MAX_SIZE
+    originalWidth > MAX_SIZE ||
+    originalHeight > MAX_SIZE
   ) {
 
     scale =
       Math.min(
-        MAX_SIZE / width,
-        MAX_SIZE / height
+        MAX_SIZE / originalWidth,
+        MAX_SIZE / originalHeight
       );
 
   }
 
+
   const canvas =
-    document.createElement("canvas");
+    document.createElement(
+      "canvas"
+    );
+
 
   canvas.width =
     Math.max(
       1,
-      Math.round(width * scale)
+      Math.round(
+        originalWidth * scale
+      )
     );
+
 
   canvas.height =
     Math.max(
       1,
-      Math.round(height * scale)
+      Math.round(
+        originalHeight * scale
+      )
     );
 
+
   const ctx =
-    canvas.getContext("2d", {
-      willReadFrequently: true
-    });
+    canvas.getContext(
+      "2d",
+      {
+        willReadFrequently:
+          true
+      }
+    );
+
 
   /*
-    สำคัญมาก:
+    สำคัญ:
+    วาดทั้งรูป
     ไม่ crop
-    ไม่ rotate
-    ไม่ยืด
+    ไม่เปลี่ยนอัตราส่วน
   */
 
   ctx.drawImage(
@@ -612,67 +835,25 @@ async function prepareOCRImage(file) {
     canvas.height
   );
 
-  return {
-    canvas,
-    width: canvas.width,
-    height: canvas.height
-  };
+
+  return canvas;
 
 }
 
 
 /* =========================================================
-   LOAD IMAGE
+   GRAYSCALE COPY
 ========================================================= */
 
-function loadImage(file) {
-
-  return new Promise(
-    (resolve, reject) => {
-
-      const url =
-        URL.createObjectURL(file);
-
-      const img =
-        new Image();
-
-      img.onload = () => {
-
-        URL.revokeObjectURL(url);
-
-        resolve(img);
-
-      };
-
-      img.onerror = () => {
-
-        URL.revokeObjectURL(url);
-
-        reject(
-          new Error(
-            "ไม่สามารถเปิดรูปภาพได้"
-          )
-        );
-
-      };
-
-      img.src = url;
-
-    }
-  );
-
-}
-
-
-/* =========================================================
-   GRAYSCALE
-   ทำเฉพาะสำเนา OCR
-========================================================= */
-
-function createGrayCanvas(sourceCanvas) {
+function createGrayCanvas(
+  sourceCanvas
+) {
 
   const canvas =
-    document.createElement("canvas");
+    document.createElement(
+      "canvas"
+    );
+
 
   canvas.width =
     sourceCanvas.width;
@@ -680,16 +861,23 @@ function createGrayCanvas(sourceCanvas) {
   canvas.height =
     sourceCanvas.height;
 
+
   const ctx =
-    canvas.getContext("2d", {
-      willReadFrequently: true
-    });
+    canvas.getContext(
+      "2d",
+      {
+        willReadFrequently:
+          true
+      }
+    );
+
 
   ctx.drawImage(
     sourceCanvas,
     0,
     0
   );
+
 
   const imageData =
     ctx.getImageData(
@@ -699,8 +887,10 @@ function createGrayCanvas(sourceCanvas) {
       canvas.height
     );
 
+
   const data =
     imageData.data;
+
 
   for (
     let i = 0;
@@ -715,17 +905,25 @@ function createGrayCanvas(sourceCanvas) {
         data[i + 2] * 0.114
       );
 
-    data[i] = gray;
-    data[i + 1] = gray;
-    data[i + 2] = gray;
+
+    data[i] =
+      gray;
+
+    data[i + 1] =
+      gray;
+
+    data[i + 2] =
+      gray;
 
   }
+
 
   ctx.putImageData(
     imageData,
     0,
     0
   );
+
 
   return canvas;
 
@@ -736,9 +934,14 @@ function createGrayCanvas(sourceCanvas) {
    OCR TEXT CLEAN
 ========================================================= */
 
-function cleanOCRText(text) {
+function cleanOCRText(
+  text
+) {
 
-  if (!text) return "";
+  if (!text) {
+    return "";
+  }
+
 
   let result =
     String(text)
@@ -747,9 +950,10 @@ function cleanOCRText(text) {
       .replace(/\n{3,}/g, "\n\n")
       .trim();
 
-  /*
-    แก้คำที่ Tesseract มักอ่านเพี้ยน
-  */
+
+  /* -----------------------------------------
+     คำไทยที่ Tesseract อ่านเพี้ยนบ่อย
+  ----------------------------------------- */
 
   const replacements = [
 
@@ -778,20 +982,25 @@ function cleanOCRText(text) {
 
   ];
 
+
   for (
-    const [wrong, right]
+    const pair
     of replacements
   ) {
 
     result =
-      result.split(wrong).join(right);
+      result.split(
+        pair[0]
+      ).join(
+        pair[1]
+      );
 
   }
 
 
-  /*
-    รวมคำภาษาอังกฤษที่ถูกตัดบรรทัด
-  */
+  /* -----------------------------------------
+     English คำที่ถูกตัดบรรทัด
+  ----------------------------------------- */
 
   result =
     result.replace(
@@ -799,82 +1008,233 @@ function cleanOCRText(text) {
       "Recommended"
     );
 
+
   result =
     result.replace(
-      /\b(consume|immediate)\s*\n\s*(d|ly)\b/gi,
-      "$1$2"
+      /\b(immediate)\s*\n\s*(ly)\b/gi,
+      "immediately"
     );
 
 
-  /*
-    ลบ noise ที่เป็นตัวเดี่ยว
-  */
+  result =
+    result.replace(
+      /\b(consume)\s*\n\s*(d)\b/gi,
+      "consumed"
+    );
+
+
+  /* -----------------------------------------
+     แยกบรรทัด
+  ----------------------------------------- */
 
   const lines =
     result
       .split("\n")
-      .map(line => line.trim())
+      .map(
+        line =>
+          line
+            .trim()
+            .replace(/\s{2,}/g, " ")
+      )
       .filter(Boolean);
+
 
   const cleanedLines = [];
 
-  for (const line of lines) {
+
+  for (
+    const line
+    of lines
+  ) {
 
     const compact =
-      line.replace(/\s/g, "");
+      line.replace(
+        /\s/g,
+        ""
+      );
 
-    if (!compact) continue;
 
-    /*
-      noise ที่พบบ่อย
-    */
+    if (!compact) {
+      continue;
+    }
+
+
+    /* ---------------------------------------
+       noise ที่แน่นอน
+    --------------------------------------- */
 
     if (
-      /^(Ww|W|ww|ศศ|ศ|unknown|-unknown)$/i
-        .test(compact)
+      /^(Ww|W|ww|ศศ|ศ)$/i.test(
+        compact
+      )
     ) {
       continue;
     }
 
-    /*
-      บรรทัดที่มีแต่เครื่องหมาย
-    */
 
     if (
-      /^[\W_]+$/u.test(compact)
+      /^(unknown|unknown[-_]?|[-_]?unknown)$/i.test(
+        compact
+      )
     ) {
       continue;
     }
 
+
     /*
-      ตัวอักษรเดี่ยวที่ไม่ใช่คำที่มีความหมาย
+      OCR อาจอ่าน unknown เป็น
+      unhmvn / unkn0wn / unk... 
+      ถ้าเป็นบรรทัดสั้น ๆ ที่ดูเป็น
+      noise ให้ตัดออก
     */
+
+    if (
+      /^[a-z]{5,8}$/i.test(
+        compact
+      ) &&
+      !/[aeiou]{2,}/i.test(
+        compact
+      )
+    ) {
+
+      const suspicious =
+        /^(unhmvn|unhmw|unknwn|unkn0wn|unknvn|unhnvn)$/i;
+
+      if (
+        suspicious.test(
+          compact
+        )
+      ) {
+        continue;
+      }
+
+    }
+
+
+    /* ---------------------------------------
+       บรรทัดที่มีแต่เครื่องหมาย
+    --------------------------------------- */
+
+    if (
+      /^[\W_]+$/u.test(
+        compact
+      )
+    ) {
+      continue;
+    }
+
+
+    /* ---------------------------------------
+       ตัวอักษรเดี่ยวที่ไม่ใช่ข้อความ
+    --------------------------------------- */
 
     if (
       compact.length === 1 &&
-      !/[ก-๙a-zA-Z0-9]/.test(compact)
+      !/[ก-๙a-zA-Z0-9]/.test(
+        compact
+      )
     ) {
       continue;
     }
 
-    cleanedLines.push(line);
+
+    cleanedLines.push(
+      line
+    );
 
   }
 
 
-  /*
-    ลบประโยคซ้ำติดกัน
-  */
+  /* -----------------------------------------
+     รวมบรรทัดที่เป็นคำเดียวกัน
+  ----------------------------------------- */
+
+  const mergedLines = [];
+
+
+  for (
+    let i = 0;
+    i < cleanedLines.length;
+    i++
+  ) {
+
+    const current =
+      cleanedLines[i];
+
+
+    const next =
+      cleanedLines[i + 1] || "";
+
+
+    /*
+      English ที่ถูกแบ่งเป็นคำ
+    */
+
+    if (
+      /^[A-Za-z]+$/.test(
+        current
+      ) &&
+      /^[A-Za-z]+$/.test(
+        next
+      ) &&
+      current.length <= 15 &&
+      next.length <= 8
+    ) {
+
+      const combined =
+        current +
+        next;
+
+
+      /*
+        เฉพาะกรณีที่ดูเหมือน
+        คำเดียวที่ถูกตัด
+      */
+
+      if (
+        /^(Recommend|immediate|consume|available|plastic|English|because|something)/i.test(
+          combined
+        )
+      ) {
+
+        mergedLines.push(
+          combined
+        );
+
+        i++;
+
+        continue;
+
+      }
+
+    }
+
+
+    mergedLines.push(
+      current
+    );
+
+  }
+
+
+  /* -----------------------------------------
+     ลบ duplicate line ที่ติดกัน
+  ----------------------------------------- */
 
   const uniqueLines = [];
 
-  for (const line of cleanedLines) {
+
+  for (
+    const line
+    of mergedLines
+  ) {
 
     const normalized =
       line
         .toLowerCase()
         .replace(/\s+/g, " ")
         .trim();
+
 
     const previous =
       uniqueLines.length
@@ -886,152 +1246,301 @@ function cleanOCRText(text) {
             .trim()
         : "";
 
+
     if (
       normalized &&
       normalized !== previous
     ) {
 
-      uniqueLines.push(line);
+      uniqueLines.push(
+        line
+      );
 
     }
 
   }
 
 
-  result =
-    uniqueLines.join("\n");
-
-
-  /*
-    ลดบรรทัดว่าง
-  */
-
-  result =
-    result
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-
-  return result;
+  return uniqueLines
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
 }
 
 
 /* =========================================================
-   OCR QUALITY
+   OCR QUALITY SCORE
 ========================================================= */
 
 function calculateOCRScore(
-  text,
+  rawText,
+  cleanText,
   confidence
 ) {
 
-  if (!text) return -9999;
+  if (!cleanText) {
+    return -999999;
+  }
+
+
+  const raw =
+    String(rawText || "")
+      .trim();
+
 
   const clean =
-    text.trim();
+    String(cleanText || "")
+      .trim();
 
-  if (!clean) return -9999;
 
-  const chars =
-    clean.replace(/\s/g, "");
+  const compact =
+    clean.replace(
+      /\s/g,
+      ""
+    );
+
 
   const usefulChars =
-    (chars.match(
-      /[ก-๙a-zA-Z0-9]/g
-    ) || []).length;
+    (
+      compact.match(
+        /[ก-๙a-zA-Z0-9]/g
+      ) || []
+    ).length;
+
+
+  const thaiChars =
+    (
+      compact.match(
+        /[ก-๙]/g
+      ) || []
+    ).length;
+
+
+  const englishChars =
+    (
+      compact.match(
+        /[a-zA-Z]/g
+      ) || []
+    ).length;
+
 
   const strangeChars =
-    (chars.match(
-      /[^\u0E00-\u0E7Fa-zA-Z0-9.,!?'"“”‘’():;%\-–—/]/g
-    ) || []).length;
+    (
+      compact.match(
+        /[^\u0E00-\u0E7Fa-zA-Z0-9.,!?'"“”‘’():;%\-–—/]/g
+      ) || []
+    ).length;
+
 
   const lines =
     clean
       .split("\n")
-      .map(x => x.trim())
+      .map(
+        x => x.trim()
+      )
       .filter(Boolean);
 
-  let garbageLines = 0;
 
-  let isolatedLines = 0;
+  let score = 0;
 
-  for (const line of lines) {
 
-    const compact =
-      line.replace(/\s/g, "");
+  /*
+    ความมั่นใจ
+  */
+
+  score +=
+    Number(
+      confidence || 0
+    ) * 0.50;
+
+
+  /*
+    ตัวอักษรจริง
+  */
+
+  score +=
+    Math.min(
+      usefulChars,
+      220
+    ) * 0.45;
+
+
+  /*
+    ให้คะแนนข้อความหลายบรรทัด
+    แต่ไม่ให้ผลที่มี noise เยอะได้เปรียบ
+  */
+
+  score +=
+    Math.min(
+      lines.length,
+      8
+    ) * 7;
+
+
+  /*
+    ภาษาไทย / อังกฤษจริง
+  */
+
+  if (thaiChars > 0) {
+
+    score +=
+      Math.min(
+        thaiChars,
+        80
+      ) * 0.12;
+
+  }
+
+
+  if (englishChars > 0) {
+
+    score +=
+      Math.min(
+        englishChars,
+        100
+      ) * 0.08;
+
+  }
+
+
+  /*
+    ลงโทษ noise
+  */
+
+  score -=
+    strangeChars * 5;
+
+
+  let veryShortLines =
+    0;
+
+
+  let garbageLines =
+    0;
+
+
+  let suspiciousEnglishLines =
+    0;
+
+
+  for (
+    const line
+    of lines
+  ) {
+
+    const c =
+      line.replace(
+        /\s/g,
+        ""
+      );
+
 
     if (
-      compact.length <= 2
+      c.length <= 2
     ) {
 
-      isolatedLines++;
+      veryShortLines++;
 
     }
 
+
     const useful =
       (
-        compact.match(
+        c.match(
           /[ก-๙a-zA-Z0-9]/g
         ) || []
       ).length;
 
+
     if (
-      compact.length >= 4 &&
-      useful / compact.length < 0.35
+      c.length >= 4 &&
+      useful / c.length < 0.45
     ) {
 
       garbageLines++;
 
     }
 
+
+    /*
+      คำอังกฤษแปลก ๆ ที่เป็น noise
+    */
+
+    if (
+      /^[A-Za-z]{5,12}$/.test(
+        c
+      ) &&
+      !/[aeiou]{2,}/i.test(
+        c
+      )
+    ) {
+
+      suspiciousEnglishLines++;
+
+    }
+
   }
 
 
+  score -=
+    veryShortLines * 10;
+
+
+  score -=
+    garbageLines * 18;
+
+
+  score -=
+    suspiciousEnglishLines * 12;
+
+
   /*
-    ให้คะแนนแบบเน้น:
-    - ความมั่นใจ
-    - ตัวอักษรจริง
-    - จำนวนบรรทัดพอดี
-    - ลงโทษ noise
+    ถ้ามีบรรทัดเยอะผิดปกติ
+    มีโอกาสเป็น OCR ขยะ
   */
 
-  let score = 0;
-
-  score +=
-    Number(confidence || 0) * 0.45;
-
-  score +=
-    Math.min(
-      usefulChars,
-      180
-    ) * 0.4;
-
-  score +=
-    Math.min(
-      lines.length,
-      8
-    ) * 6;
-
-  score -=
-    strangeChars * 3;
-
-  score -=
-    garbageLines * 15;
-
-  score -=
-    isolatedLines * 8;
-
-  if (lines.length > 12) {
+  if (
+    lines.length > 10
+  ) {
 
     score -=
-      (lines.length - 12) * 7;
+      (lines.length - 10) *
+      10;
 
   }
 
+
   /*
-    ถ้าข้อความสั้นมาก แต่มั่นใจสูง
-    อย่าตัดทิ้ง
+    ถ้าข้อความยาวมากแบบไม่มีช่องว่าง
+    มักเป็น OCR noise
   */
+
+  if (
+    compact.length > 300 &&
+    lines.length <= 2
+  ) {
+
+    score -= 50;
+
+  }
+
+
+  /*
+    ถ้า raw มีคำ unknown
+    ลงคะแนนผลนั้น
+  */
+
+  if (
+    /unknown/i.test(
+      raw
+    )
+  ) {
+
+    score -= 35;
+
+  }
+
 
   return score;
 
@@ -1039,7 +1548,7 @@ function calculateOCRScore(
 
 
 /* =========================================================
-   RUN SINGLE OCR
+   RECOGNIZE
 ========================================================= */
 
 async function recognizeImage(
@@ -1061,8 +1570,12 @@ async function recognizeImage(
 
   });
 
+
   const result =
-    await worker.recognize(image);
+    await worker.recognize(
+      image
+    );
+
 
   const text =
     result &&
@@ -1070,12 +1583,15 @@ async function recognizeImage(
       ? result.data.text || ""
       : "";
 
+
   const confidence =
     result &&
     result.data &&
-    typeof result.data.confidence === "number"
+    typeof result.data.confidence ===
+      "number"
       ? result.data.confidence
       : 0;
+
 
   return {
     text,
@@ -1086,11 +1602,13 @@ async function recognizeImage(
 
 
 /* =========================================================
-   OCR
-   ONLY 3 PASSES
+   RUN OCR
+   3 PASSES ONLY
 ========================================================= */
 
-async function runOCR(file) {
+async function runOCR(
+  file
+) {
 
   if (isOCRRunning) {
 
@@ -1103,123 +1621,171 @@ async function runOCR(file) {
 
   }
 
-  isOCRRunning = true;
+
+  isOCRRunning =
+    true;
+
 
   if (ocrCard) {
-    ocrCard.hidden = false;
+
+    ocrCard.hidden =
+      false;
+
   }
+
 
   if (ocrText) {
+
     ocrText.value =
       "";
+
   }
 
-  showLoading(
-    "กำลังอ่านตัวอักษร..."
-  );
 
   hideStatus();
+
 
   try {
 
     const worker =
       await getOCRWorker();
 
-    const prepared =
-      await prepareOCRImage(file);
+
+    const canvas =
+      await prepareOCRImage(
+        file
+      );
+
 
     /*
       PASS 1
-      รูปเต็มต้นฉบับ
-      เหมาะกับข้อความทั่วไป
+      รูปเต็ม
+      PSM 6
     */
 
     showLoading(
       "กำลังอ่านข้อความจากรูป..."
     );
 
+
     const pass1 =
       await recognizeImage(
         worker,
-        prepared.canvas,
+        canvas,
         6
       );
 
+
     /*
       PASS 2
-      รูปเต็มแบบ grayscale
-      ช่วยกรณีพื้นหลัง/แสงไม่สม่ำเสมอ
+      grayscale
+      PSM 6
+    */
+
+    showLoading(
+      "กำลังตรวจข้อความ..."
+    );
+
+
+    const grayCanvas =
+      createGrayCanvas(
+        canvas
+      );
+
+
+    const pass2 =
+      await recognizeImage(
+        worker,
+        grayCanvas,
+        6
+      );
+
+
+    /*
+      PASS 3
+      รูปเต็ม
+      PSM 11
+      เหมาะกับข้อความที่แยกหลายตำแหน่ง
     */
 
     showLoading(
       "กำลังตรวจข้อความอีกครั้ง..."
     );
 
-    const grayCanvas =
-      createGrayCanvas(
-        prepared.canvas
-      );
-
-    const pass2 =
-      await recognizeImage(
-        worker,
-        grayCanvas,
-        11
-      );
-
-    /*
-      PASS 3
-      รูปเต็มแบบ sparse text
-      ไม่ crop เพื่อไม่ทำข้อความด้านบน/ล่างหาย
-    */
-
-    showLoading(
-      "กำลังเลือกผลที่อ่านได้ชัดที่สุด..."
-    );
 
     const pass3 =
       await recognizeImage(
         worker,
-        prepared.canvas,
+        canvas,
         11
       );
 
 
+    /* -----------------------------------------
+       CLEAN
+    ----------------------------------------- */
+
     const candidates = [
 
       {
-        name: "full-normal",
-        text: cleanOCRText(
-          pass1.text
-        ),
+        name:
+          "full-normal",
+
+        raw:
+          pass1.text,
+
+        text:
+          cleanOCRText(
+            pass1.text
+          ),
+
         confidence:
           pass1.confidence
+
       },
 
+
       {
-        name: "full-gray",
-        text: cleanOCRText(
-          pass2.text
-        ),
+        name:
+          "full-gray",
+
+        raw:
+          pass2.text,
+
+        text:
+          cleanOCRText(
+            pass2.text
+          ),
+
         confidence:
           pass2.confidence
+
       },
 
+
       {
-        name: "full-sparse",
-        text: cleanOCRText(
-          pass3.text
-        ),
+        name:
+          "full-sparse",
+
+        raw:
+          pass3.text,
+
+        text:
+          cleanOCRText(
+            pass3.text
+          ),
+
         confidence:
           pass3.confidence
+
       }
 
     ];
 
 
-    /*
-      คำนวณคะแนน
-    */
+    /* -----------------------------------------
+       SCORE
+    ----------------------------------------- */
 
     for (
       const candidate
@@ -1228,6 +1794,7 @@ async function runOCR(file) {
 
       candidate.score =
         calculateOCRScore(
+          candidate.raw,
           candidate.text,
           candidate.confidence
         );
@@ -1236,12 +1803,13 @@ async function runOCR(file) {
 
 
     /*
-      เรียงเฉพาะภายในระบบ
+      เรียงผล
     */
 
     candidates.sort(
       (a, b) =>
-        b.score - a.score
+        b.score -
+        a.score
     );
 
 
@@ -1262,8 +1830,39 @@ async function runOCR(file) {
 
 
     /*
-      แสดงผล
+      ป้องกันกรณี OCR เลือก
+      ผลที่เป็นคำ noise อย่างเดียว
     */
+
+    if (
+      /^[-_\s]*(unknown|unhmvn|unhmw|unknwn)[-_\s]*$/i.test(
+        best.text
+      )
+    ) {
+
+      const alternative =
+        candidates.find(
+          candidate =>
+            candidate.text &&
+            !/^[-_\s]*(unknown|unhmvn|unhmw|unknwn)[-_\s]*$/i.test(
+              candidate.text
+            )
+        );
+
+
+      if (alternative) {
+
+        best.text =
+          alternative.text;
+
+      }
+
+    }
+
+
+    /* -----------------------------------------
+       แสดงผล
+    ----------------------------------------- */
 
     if (ocrText) {
 
@@ -1272,13 +1871,17 @@ async function runOCR(file) {
 
     }
 
+
     if (ocrCard) {
 
-      ocrCard.hidden = false;
+      ocrCard.hidden =
+        false;
 
     }
 
+
     hideLoading();
+
 
     showStatus(
       "สแกนข้อความเรียบร้อยแล้ว",
@@ -1293,20 +1896,28 @@ async function runOCR(file) {
       error
     );
 
+
     hideLoading();
 
+
     if (ocrText) {
-      ocrText.value = "";
+
+      ocrText.value =
+        "";
+
     }
+
 
     showStatus(
       "อ่านตัวอักษรจากรูปไม่สำเร็จ ลองใช้รูปที่คมชัดและเห็นข้อความครบค่ะ",
       "error"
     );
 
+
   } finally {
 
-    isOCRRunning = false;
+    isOCRRunning =
+      false;
 
   }
 
@@ -1314,7 +1925,7 @@ async function runOCR(file) {
 
 
 /* =========================================================
-   USE OCR TEXT
+   USE OCR
 ========================================================= */
 
 if (useOcrButton) {
@@ -1328,6 +1939,7 @@ if (useOcrButton) {
           ? ocrText.value.trim()
           : "";
 
+
       if (!text) {
 
         showStatus(
@@ -1339,6 +1951,7 @@ if (useOcrButton) {
 
       }
 
+
       if (inputText) {
 
         inputText.value =
@@ -1346,12 +1959,18 @@ if (useOcrButton) {
 
       }
 
+
       showStatus(
         "นำข้อความไปไว้ในช่องแปลแล้ว",
         "success"
       );
 
-      inputText?.focus();
+
+      if (inputText) {
+
+        inputText.focus();
+
+      }
 
     }
   );
@@ -1374,7 +1993,9 @@ if (speakOcrButton) {
           ? ocrText.value.trim()
           : "";
 
+
       if (!text) return;
+
 
       speakText(
         text,
@@ -1388,7 +2009,7 @@ if (speakOcrButton) {
 
 
 /* =========================================================
-   TRANSLATE
+   TRANSLATE BUTTON
 ========================================================= */
 
 if (translateButton) {
@@ -1401,14 +2022,22 @@ if (translateButton) {
 }
 
 
+/* =========================================================
+   TRANSLATE
+========================================================= */
+
 async function translateText() {
 
-  if (isTranslating) return;
+  if (isTranslating) {
+    return;
+  }
+
 
   const text =
     inputText
       ? inputText.value.trim()
       : "";
+
 
   if (!text) {
 
@@ -1421,23 +2050,26 @@ async function translateText() {
 
   }
 
-  isTranslating = true;
 
-  translateButton.disabled = true;
+  isTranslating =
+    true;
+
+
+  if (translateButton) {
+
+    translateButton.disabled =
+      true;
+
+  }
+
+
+  hideStatus();
+
 
   showLoading(
     "กำลังแปลภาษา..."
   );
 
-  hideStatus();
-
-  if (resultText) {
-
-    resultText.classList.remove(
-      "empty"
-    );
-
-  }
 
   try {
 
@@ -1445,28 +2077,33 @@ async function translateText() {
       await fetch(
         API_URL,
         {
-          method: "POST",
+
+          method:
+            "POST",
 
           headers: {
+
             "Content-Type":
               "text/plain;charset=utf-8"
+
           },
 
-          body: JSON.stringify({
+          body:
+            JSON.stringify({
 
-            action:
-              "translate",
+              action:
+                "translate",
 
-            text:
-              text,
+              text:
+                text,
 
-            source:
-              sourceLanguage,
+              source:
+                sourceLanguage,
 
-            target:
-              targetLanguage
+              target:
+                targetLanguage
 
-          })
+            })
 
         }
       );
@@ -1527,6 +2164,10 @@ async function translateText() {
       resultText.textContent =
         translated;
 
+      resultText.classList.remove(
+        "empty"
+      );
+
     }
 
 
@@ -1543,6 +2184,7 @@ async function translateText() {
       error
     );
 
+
     if (resultText) {
 
       resultText.textContent =
@@ -1554,19 +2196,28 @@ async function translateText() {
 
     }
 
+
     showStatus(
       "เชื่อมต่อระบบแปลภาษาไม่สำเร็จ",
       "error"
     );
 
+
   } finally {
 
     hideLoading();
 
-    translateButton.disabled =
-      false;
 
-    isTranslating = false;
+    if (translateButton) {
+
+      translateButton.disabled =
+        false;
+
+    }
+
+
+    isTranslating =
+      false;
 
   }
 
@@ -1577,11 +2228,16 @@ async function translateText() {
    CLEAN TRANSLATION
 ========================================================= */
 
-function cleanTranslation(text) {
+function cleanTranslation(
+  text
+) {
 
-  if (!text) return "";
+  if (!text) {
+    return "";
+  }
 
-  let result =
+
+  const result =
     String(text)
       .replace(/\r/g, "")
       .replace(/[ \t]+/g, " ")
@@ -1589,21 +2245,23 @@ function cleanTranslation(text) {
       .trim();
 
 
-  /*
-    ลบประโยคซ้ำ
-  */
-
   const lines =
     result
       .split("\n")
-      .map(x => x.trim())
+      .map(
+        line =>
+          line.trim()
+      )
       .filter(Boolean);
 
 
   const unique = [];
 
 
-  for (const line of lines) {
+  for (
+    const line
+    of lines
+  ) {
 
     const normalized =
       line
@@ -1612,10 +2270,14 @@ function cleanTranslation(text) {
         .trim();
 
 
-    let duplicate = false;
+    let duplicate =
+      false;
 
 
-    for (const oldLine of unique) {
+    for (
+      const oldLine
+      of unique
+    ) {
 
       const oldNormalized =
         oldLine
@@ -1629,7 +2291,8 @@ function cleanTranslation(text) {
         oldNormalized
       ) {
 
-        duplicate = true;
+        duplicate =
+          true;
 
         break;
 
@@ -1640,6 +2303,7 @@ function cleanTranslation(text) {
         normalized
           .split(/\s+/)
           .filter(Boolean);
+
 
       const b =
         oldNormalized
@@ -1655,15 +2319,26 @@ function cleanTranslation(text) {
         const setB =
           new Set(b);
 
-        let same = 0;
 
-        for (const word of a) {
+        let same =
+          0;
 
-          if (setB.has(word)) {
+
+        for (
+          const word
+          of a
+        ) {
+
+          if (
+            setB.has(word)
+          ) {
+
             same++;
+
           }
 
         }
+
 
         const overlap =
           same /
@@ -1672,9 +2347,13 @@ function cleanTranslation(text) {
             b.length
           );
 
-        if (overlap >= 0.82) {
 
-          duplicate = true;
+        if (
+          overlap >= 0.82
+        ) {
+
+          duplicate =
+            true;
 
           break;
 
@@ -1687,14 +2366,18 @@ function cleanTranslation(text) {
 
     if (!duplicate) {
 
-      unique.push(line);
+      unique.push(
+        line
+      );
 
     }
 
   }
 
 
-  return unique.join("\n");
+  return unique.join(
+    "\n"
+  );
 
 }
 
@@ -1708,7 +2391,10 @@ function speakText(
   language
 ) {
 
-  if (!text) return;
+  if (!text) {
+    return;
+  }
+
 
   if (
     !("speechSynthesis" in window)
@@ -1739,8 +2425,12 @@ function speakText(
       : "en-US";
 
 
-  utterance.rate = 0.9;
-  utterance.pitch = 1;
+  utterance.rate =
+    0.9;
+
+
+  utterance.pitch =
+    1;
 
 
   window.speechSynthesis.speak(
@@ -1765,6 +2455,7 @@ if (speakResultButton) {
           ? resultText.textContent.trim()
           : "";
 
+
       if (
         !text ||
         text ===
@@ -1774,6 +2465,7 @@ if (speakResultButton) {
         return;
 
       }
+
 
       speakText(
         text,
@@ -1801,6 +2493,7 @@ if (copyResultButton) {
           ? resultText.textContent.trim()
           : "";
 
+
       if (
         !text ||
         text ===
@@ -1818,36 +2511,40 @@ if (copyResultButton) {
           text
         );
 
+
         showStatus(
           "คัดลอกคำแปลแล้ว",
           "success"
         );
 
-      } catch (error) {
 
-        /*
-          fallback สำหรับบาง browser
-        */
+      } catch (error) {
 
         const textarea =
           document.createElement(
             "textarea"
           );
 
+
         textarea.value =
           text;
+
 
         document.body.appendChild(
           textarea
         );
 
+
         textarea.select();
+
 
         document.execCommand(
           "copy"
         );
 
+
         textarea.remove();
+
 
         showStatus(
           "คัดลอกคำแปลแล้ว",
@@ -1863,7 +2560,7 @@ if (copyResultButton) {
 
 
 /* =========================================================
-   CLEAR INPUT
+   CLEAR
 ========================================================= */
 
 if (clearInputButton) {
@@ -1873,8 +2570,12 @@ if (clearInputButton) {
     () => {
 
       if (inputText) {
-        inputText.value = "";
+
+        inputText.value =
+          "";
+
       }
+
 
       if (resultText) {
 
@@ -1887,13 +2588,22 @@ if (clearInputButton) {
 
       }
 
+
       if (ocrText) {
-        ocrText.value = "";
+
+        ocrText.value =
+          "";
+
       }
 
+
       if (ocrCard) {
-        ocrCard.hidden = true;
+
+        ocrCard.hidden =
+          true;
+
       }
+
 
       if (selectedImageUrl) {
 
@@ -1903,8 +2613,13 @@ if (clearInputButton) {
 
       }
 
-      selectedImageUrl = null;
-      selectedImageFile = null;
+
+      selectedImageUrl =
+        null;
+
+      selectedImageFile =
+        null;
+
 
       if (imagePreview) {
 
@@ -1914,6 +2629,7 @@ if (clearInputButton) {
 
       }
 
+
       if (imagePreviewContainer) {
 
         imagePreviewContainer.hidden =
@@ -1921,13 +2637,22 @@ if (clearInputButton) {
 
       }
 
+
       if (cameraInput) {
-        cameraInput.value = "";
+
+        cameraInput.value =
+          "";
+
       }
 
+
       if (galleryInput) {
-        galleryInput.value = "";
+
+        galleryInput.value =
+          "";
+
       }
+
 
       hideStatus();
 
@@ -1950,8 +2675,10 @@ if (swapLanguageButton) {
       const oldSource =
         sourceLanguage;
 
+
       sourceLanguage =
         targetLanguage;
+
 
       targetLanguage =
         oldSource;
@@ -1960,15 +2687,11 @@ if (swapLanguageButton) {
       updateLanguageUI();
 
 
-      /*
-        สลับข้อความในช่อง
-        ถ้ามีคำแปลอยู่แล้ว
-      */
-
       const input =
         inputText
           ? inputText.value.trim()
           : "";
+
 
       const result =
         resultText
@@ -1989,20 +2712,23 @@ if (swapLanguageButton) {
 
         }
 
+
         if (resultText) {
 
           resultText.textContent =
-            input || "คำแปลจะแสดงที่นี่";
+            input ||
+            "คำแปลจะแสดงที่นี่";
 
-          if (!input) {
 
-            resultText.classList.add(
+          if (input) {
+
+            resultText.classList.remove(
               "empty"
             );
 
           } else {
 
-            resultText.classList.remove(
+            resultText.classList.add(
               "empty"
             );
 
@@ -2025,7 +2751,7 @@ if (swapLanguageButton) {
 
 
 /* =========================================================
-   ENTER KEY
+   CTRL + ENTER
 ========================================================= */
 
 if (inputText) {
@@ -2034,14 +2760,12 @@ if (inputText) {
     "keydown",
     event => {
 
-      /*
-        Ctrl + Enter / Cmd + Enter
-      */
-
       if (
         event.key === "Enter" &&
-        (event.ctrlKey ||
-          event.metaKey)
+        (
+          event.ctrlKey ||
+          event.metaKey
+        )
       ) {
 
         event.preventDefault();
@@ -2068,7 +2792,7 @@ hideStatus();
 
 
 /* =========================================================
-   PAGE CLEANUP
+   CLEANUP
 ========================================================= */
 
 window.addEventListener(
@@ -2083,10 +2807,14 @@ window.addEventListener(
 
     }
 
+
     if (tesseractWorker) {
 
-      tesseractWorker.terminate()
-        .catch(() => {});
+      tesseractWorker
+        .terminate()
+        .catch(
+          () => {}
+        );
 
     }
 
