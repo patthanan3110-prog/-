@@ -1,8 +1,8 @@
 /* =========================================================
    ผู้ช่วยแปลภาษา
    Thai ↔ English
-   SCRIPT.JS - VERSION 56
-   FAST OCR
+   SCRIPT.JS - VERSION 57
+   FAST SINGLE OCR WORKER
    ========================================================= */
 
 "use strict";
@@ -23,20 +23,22 @@ let targetLanguage = "en";
 let selectedImageFile = null;
 let selectedImageUrl = null;
 
-let thaiWorker = null;
-let englishWorker = null;
-let mixedWorker = null;
+let ocrWorker = null;
 
-let workersReady = false;
+let workerLoading = null;
 let ocrRunning = false;
 let translationRunning = false;
+
 
 /* =========================================================
    DOM
    ========================================================= */
 
-const inputText = document.getElementById("inputText");
-const resultText = document.getElementById("resultText");
+const inputText =
+  document.getElementById("inputText");
+
+const resultText =
+  document.getElementById("resultText");
 
 const translateButton =
   document.getElementById("translateButton");
@@ -101,14 +103,21 @@ const loadingBox =
 const loadingText =
   document.getElementById("loadingText");
 
+
 /* =========================================================
    INIT
    ========================================================= */
 
-document.addEventListener("DOMContentLoaded", () => {
-  updateLanguageUI();
-  bindEvents();
-});
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+
+    updateLanguageUI();
+    bindEvents();
+
+  }
+);
+
 
 /* =========================================================
    EVENTS
@@ -116,339 +125,587 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function bindEvents() {
 
-  if (cameraButton && cameraInput) {
+  if (
+    cameraButton &&
+    cameraInput
+  ) {
+
     cameraButton.addEventListener(
       "click",
       () => cameraInput.click()
     );
+
   }
 
-  if (galleryButton && galleryInput) {
+
+  if (
+    galleryButton &&
+    galleryInput
+  ) {
+
     galleryButton.addEventListener(
       "click",
       () => galleryInput.click()
     );
+
   }
 
+
   if (cameraInput) {
+
     cameraInput.addEventListener(
       "change",
       handleImageSelected
     );
+
   }
 
+
   if (galleryInput) {
+
     galleryInput.addEventListener(
       "change",
       handleImageSelected
     );
+
   }
 
+
   if (removeImageButton) {
+
     removeImageButton.addEventListener(
       "click",
       removeImage
     );
+
   }
 
+
   if (translateButton) {
+
     translateButton.addEventListener(
       "click",
       translateText
     );
+
   }
 
+
   if (useOcrButton) {
+
     useOcrButton.addEventListener(
       "click",
       useOCRText
     );
+
   }
+
 
   if (speakOcrButton) {
+
     speakOcrButton.addEventListener(
       "click",
-      () => speakText(
-        ocrText ? ocrText.value : ""
-      )
+      () => {
+
+        speakText(
+          ocrText
+            ? ocrText.value
+            : ""
+        );
+
+      }
     );
+
   }
+
 
   if (speakResultButton) {
+
     speakResultButton.addEventListener(
       "click",
-      () => speakText(
-        resultText ? resultText.textContent : ""
-      )
+      () => {
+
+        speakText(
+          resultText
+            ? resultText.textContent
+            : ""
+        );
+
+      }
     );
+
   }
 
+
   if (copyResultButton) {
+
     copyResultButton.addEventListener(
       "click",
       copyResult
     );
+
   }
 
+
   if (clearInputButton) {
+
     clearInputButton.addEventListener(
       "click",
       clearInput
     );
+
   }
 
+
   if (swapLanguageButton) {
+
     swapLanguageButton.addEventListener(
       "click",
       swapLanguages
     );
+
   }
+
 }
 
+
 /* =========================================================
-   LANGUAGE
+   LANGUAGE UI
    ========================================================= */
 
 function updateLanguageUI() {
 
   if (sourceLanguageText) {
+
     sourceLanguageText.textContent =
       sourceLanguage === "th"
         ? "ภาษาไทย"
         : "English";
+
   }
 
+
   if (targetLanguageText) {
+
     targetLanguageText.textContent =
       targetLanguage === "th"
         ? "ภาษาไทย"
         : "English";
+
   }
+
 }
+
+
+/* =========================================================
+   SWAP LANGUAGE
+   ========================================================= */
 
 function swapLanguages() {
 
-  const oldSource = sourceLanguage;
+  const oldSource =
+    sourceLanguage;
 
-  sourceLanguage = targetLanguage;
-  targetLanguage = oldSource;
+
+  sourceLanguage =
+    targetLanguage;
+
+
+  targetLanguage =
+    oldSource;
+
 
   updateLanguageUI();
+
 
   showStatus(
     "สลับภาษาแล้ว",
     "success"
   );
+
 }
 
+
 /* =========================================================
-   IMAGE
+   IMAGE SELECT
    ========================================================= */
 
-function handleImageSelected(event) {
+function handleImageSelected(
+  event
+) {
 
   const file =
-    event?.target?.files?.[0];
+    event &&
+    event.target &&
+    event.target.files &&
+    event.target.files[0];
 
-  if (!file) return;
 
-  if (!file.type.startsWith("image/")) {
+  if (!file) {
+    return;
+  }
+
+
+  if (
+    !file.type.startsWith(
+      "image/"
+    )
+  ) {
+
     showStatus(
       "กรุณาเลือกไฟล์รูปภาพ",
       "error"
     );
+
     return;
   }
 
-  selectedImageFile = file;
+
+  selectedImageFile =
+    file;
+
 
   if (selectedImageUrl) {
+
     URL.revokeObjectURL(
       selectedImageUrl
     );
+
   }
+
 
   selectedImageUrl =
-    URL.createObjectURL(file);
+    URL.createObjectURL(
+      file
+    );
+
 
   if (imagePreview) {
+
     imagePreview.src =
       selectedImageUrl;
+
   }
+
 
   if (imagePreviewContainer) {
+
     imagePreviewContainer.hidden =
       false;
+
   }
 
+
   const fromCamera =
-    event.target === cameraInput;
+    event.target ===
+    cameraInput;
+
 
   startOCR(
     file,
     fromCamera
   );
+
 }
+
+
+/* =========================================================
+   REMOVE IMAGE
+   ========================================================= */
 
 function removeImage() {
 
-  selectedImageFile = null;
+  selectedImageFile =
+    null;
+
 
   if (selectedImageUrl) {
+
     URL.revokeObjectURL(
       selectedImageUrl
     );
-    selectedImageUrl = null;
+
+    selectedImageUrl =
+      null;
+
   }
+
 
   if (imagePreview) {
-    imagePreview.removeAttribute("src");
+
+    imagePreview.removeAttribute(
+      "src"
+    );
+
   }
+
 
   if (imagePreviewContainer) {
-    imagePreviewContainer.hidden = true;
+
+    imagePreviewContainer.hidden =
+      true;
+
   }
+
 
   if (ocrCard) {
-    ocrCard.hidden = true;
+
+    ocrCard.hidden =
+      true;
+
   }
+
 
   if (ocrText) {
-    ocrText.value = "";
+
+    ocrText.value =
+      "";
+
   }
+
 
   if (cameraInput) {
-    cameraInput.value = "";
+
+    cameraInput.value =
+      "";
+
   }
+
 
   if (galleryInput) {
-    galleryInput.value = "";
+
+    galleryInput.value =
+      "";
+
   }
+
 }
 
+
 /* =========================================================
-   TESSERACT
+   LOAD TESSERACT
    ========================================================= */
 
 async function loadTesseract() {
 
-  if (window.Tesseract) {
+  if (
+    window.Tesseract
+  ) {
+
     return window.Tesseract;
+
   }
 
-  return new Promise((resolve, reject) => {
 
-    const oldScript =
-      document.querySelector(
-        'script[data-tesseract-loader="true"]'
-      );
+  return new Promise(
+    (resolve, reject) => {
 
-    if (oldScript) {
+      const oldScript =
+        document.querySelector(
+          'script[data-tesseract-loader="true"]'
+        );
 
-      oldScript.addEventListener(
-        "load",
-        () => {
 
-          if (window.Tesseract) {
-            resolve(window.Tesseract);
-          } else {
+      if (oldScript) {
+
+        oldScript.addEventListener(
+          "load",
+          () => {
+
+            if (
+              window.Tesseract
+            ) {
+
+              resolve(
+                window.Tesseract
+              );
+
+            } else {
+
+              reject(
+                new Error(
+                  "โหลด Tesseract ไม่สำเร็จ"
+                )
+              );
+
+            }
+
+          }
+        );
+
+
+        oldScript.addEventListener(
+          "error",
+          () => {
+
             reject(
               new Error(
                 "โหลด Tesseract ไม่สำเร็จ"
               )
             );
+
           }
-
-        }
-      );
-
-      oldScript.addEventListener(
-        "error",
-        () => {
-          reject(
-            new Error(
-              "โหลด Tesseract ไม่สำเร็จ"
-            )
-          );
-        }
-      );
-
-      return;
-    }
-
-    const script =
-      document.createElement("script");
-
-    script.src = TESSERACT_URL;
-    script.async = true;
-
-    script.dataset.tesseractLoader =
-      "true";
-
-    script.onload = () => {
-
-      if (window.Tesseract) {
-        resolve(window.Tesseract);
-      } else {
-        reject(
-          new Error(
-            "ไม่พบ Tesseract.js"
-          )
         );
+
+
+        return;
+
       }
 
-    };
 
-    script.onerror = () => {
-      reject(
-        new Error(
-          "ไม่สามารถโหลด Tesseract.js ได้"
-        )
+      const script =
+        document.createElement(
+          "script"
+        );
+
+
+      script.src =
+        TESSERACT_URL;
+
+      script.async =
+        true;
+
+
+      script.dataset.tesseractLoader =
+        "true";
+
+
+      script.onload =
+        () => {
+
+          if (
+            window.Tesseract
+          ) {
+
+            resolve(
+              window.Tesseract
+            );
+
+          } else {
+
+            reject(
+              new Error(
+                "ไม่พบ Tesseract.js"
+              )
+            );
+
+          }
+
+        };
+
+
+      script.onerror =
+        () => {
+
+          reject(
+            new Error(
+              "ไม่สามารถโหลด Tesseract.js ได้"
+            )
+          );
+
+        };
+
+
+      document.head.appendChild(
+        script
       );
-    };
 
-    document.head.appendChild(script);
-  });
-}
-
-/* =========================================================
-   WORKERS
-   ========================================================= */
-
-async function createOCRWorkers() {
-
-  if (workersReady) {
-    return;
-  }
-
-  const Tesseract =
-    await loadTesseract();
-
-  showLoading(
-    "กำลังเตรียมระบบอ่านตัวอักษร..."
+    }
   );
 
-  /*
-    สร้าง worker ทั้ง 3 ตัวครั้งแรกเท่านั้น
-    หลังจากนั้นจะไม่สร้างใหม่ทุกครั้ง
-  */
-
-  thaiWorker =
-    await Tesseract.createWorker("tha");
-
-  englishWorker =
-    await Tesseract.createWorker("eng");
-
-  mixedWorker =
-    await Tesseract.createWorker("tha+eng");
-
-  workersReady = true;
-
-  hideLoading();
 }
 
+
 /* =========================================================
-   IMAGE PREPARATION
+   SINGLE OCR WORKER
+   ========================================================= */
+
+async function getOCRWorker() {
+
+  if (ocrWorker) {
+
+    return ocrWorker;
+
+  }
+
+
+  if (workerLoading) {
+
+    return workerLoading;
+
+  }
+
+
+  workerLoading =
+    (async () => {
+
+      const Tesseract =
+        await loadTesseract();
+
+
+      showLoading(
+        "กำลังเตรียมระบบสแกนข้อความ..."
+      );
+
+
+      /*
+        สำคัญ:
+        สร้างแค่ worker เดียว
+        รองรับทั้งภาษาไทยและอังกฤษ
+      */
+
+      ocrWorker =
+        await Tesseract.createWorker(
+          "tha+eng"
+        );
+
+
+      try {
+
+        await ocrWorker.setParameters({
+
+          tessedit_pageseg_mode:
+            "6",
+
+          preserve_interword_spaces:
+            "1"
+
+        });
+
+      } catch (error) {
+
+        console.warn(
+          "ตั้งค่า OCR:",
+          error
+        );
+
+      }
+
+
+      hideLoading();
+
+
+      return ocrWorker;
+
+    })();
+
+
+  try {
+
+    return await workerLoading;
+
+  } finally {
+
+    workerLoading =
+      null;
+
+  }
+
+}
+
+
+/* =========================================================
+   PREPARE IMAGE
    ========================================================= */
 
 async function prepareImage(
@@ -457,22 +714,28 @@ async function prepareImage(
 ) {
 
   const img =
-    await loadImage(file);
+    await loadImage(
+      file
+    );
+
 
   let width =
     img.naturalWidth;
 
+
   let height =
     img.naturalHeight;
 
+
   /*
-    จำกัดขนาดเพื่อให้ OCR เร็วขึ้น
+    ลดขนาดภาพเพื่อให้เร็วขึ้น
   */
 
   const maxSize =
     fromCamera
       ? 2200
       : 2400;
+
 
   const scale =
     Math.min(
@@ -481,21 +744,28 @@ async function prepareImage(
       maxSize / height
     );
 
+
   width =
     Math.max(
       1,
-      Math.round(width * scale)
+      Math.round(
+        width * scale
+      )
     );
+
 
   height =
     Math.max(
       1,
-      Math.round(height * scale)
+      Math.round(
+        height * scale
+      )
     );
 
+
   /*
-    กล้องถ้าภาพเล็กเกินไป
-    ขยายเพียงเล็กน้อย
+    กล้องภาพเล็ก
+    ขยายเล็กน้อยเท่านั้น
   */
 
   if (
@@ -509,26 +779,47 @@ async function prepareImage(
         1400 / width
       );
 
+
     width =
-      Math.round(width * enlarge);
+      Math.round(
+        width * enlarge
+      );
+
 
     height =
-      Math.round(height * enlarge);
+      Math.round(
+        height * enlarge
+      );
+
   }
 
-  const canvas =
-    document.createElement("canvas");
 
-  canvas.width = width;
-  canvas.height = height;
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
+
+
+  canvas.width =
+    width;
+
+  canvas.height =
+    height;
+
 
   const ctx =
-    canvas.getContext("2d", {
-      willReadFrequently: true
-    });
+    canvas.getContext(
+      "2d"
+    );
 
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
+
+  ctx.imageSmoothingEnabled =
+    true;
+
+
+  ctx.imageSmoothingQuality =
+    "high";
+
 
   ctx.drawImage(
     img,
@@ -538,60 +829,89 @@ async function prepareImage(
     height
   );
 
-  /*
-    VERSION 56
-    ใช้แค่ 3 variant หลัก
-    เพื่อลดเวลา OCR
-  */
 
   return {
 
     normal:
-      canvas.toDataURL("image/jpeg", 0.92),
+      canvas.toDataURL(
+        "image/jpeg",
+        0.90
+      ),
 
     enhanced:
-      createEnhancedVariant(canvas),
-
-    grayscale:
-      createGrayscaleVariant(canvas)
+      createEnhancedVariant(
+        canvas
+      )
 
   };
+
 }
 
-function loadImage(file) {
-
-  return new Promise((resolve, reject) => {
-
-    const url =
-      URL.createObjectURL(file);
-
-    const img =
-      new Image();
-
-    img.onload = () => {
-
-      URL.revokeObjectURL(url);
-
-      resolve(img);
-    };
-
-    img.onerror = () => {
-
-      URL.revokeObjectURL(url);
-
-      reject(
-        new Error(
-          "ไม่สามารถเปิดรูปภาพได้"
-        )
-      );
-    };
-
-    img.src = url;
-  });
-}
 
 /* =========================================================
-   IMAGE VARIANTS
+   LOAD IMAGE
+   ========================================================= */
+
+function loadImage(
+  file
+) {
+
+  return new Promise(
+    (resolve, reject) => {
+
+      const url =
+        URL.createObjectURL(
+          file
+        );
+
+
+      const img =
+        new Image();
+
+
+      img.onload =
+        () => {
+
+          URL.revokeObjectURL(
+            url
+          );
+
+
+          resolve(
+            img
+          );
+
+        };
+
+
+      img.onerror =
+        () => {
+
+          URL.revokeObjectURL(
+            url
+          );
+
+
+          reject(
+            new Error(
+              "ไม่สามารถเปิดรูปภาพได้"
+            )
+          );
+
+        };
+
+
+      img.src =
+        url;
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   ENHANCED IMAGE
    ========================================================= */
 
 function createEnhancedVariant(
@@ -599,27 +919,35 @@ function createEnhancedVariant(
 ) {
 
   const canvas =
-    document.createElement("canvas");
+    document.createElement(
+      "canvas"
+    );
+
 
   canvas.width =
     sourceCanvas.width;
 
+
   canvas.height =
     sourceCanvas.height;
+
 
   const ctx =
     canvas.getContext(
       "2d",
       {
-        willReadFrequently: true
+        willReadFrequently:
+          true
       }
     );
+
 
   ctx.drawImage(
     sourceCanvas,
     0,
     0
   );
+
 
   const imageData =
     ctx.getImageData(
@@ -629,8 +957,10 @@ function createEnhancedVariant(
       canvas.height
     );
 
+
   const data =
     imageData.data;
+
 
   for (
     let i = 0;
@@ -642,19 +972,34 @@ function createEnhancedVariant(
       0.299 * data[i] +
       0.587 * data[i + 1] +
       0.114 * data[i + 2];
+
 
     const value =
-      ((gray - 128) * 1.25) + 128;
+      (
+        (gray - 128) *
+        1.25
+      ) + 128;
+
 
     data[i] =
-      clamp(value);
+      clamp(
+        value
+      );
+
 
     data[i + 1] =
-      clamp(value);
+      clamp(
+        value
+      );
+
 
     data[i + 2] =
-      clamp(value);
+      clamp(
+        value
+      );
+
   }
+
 
   ctx.putImageData(
     imageData,
@@ -662,88 +1007,35 @@ function createEnhancedVariant(
     0
   );
 
+
   return canvas.toDataURL(
     "image/jpeg",
-    0.92
+    0.90
   );
+
 }
 
-function createGrayscaleVariant(
-  sourceCanvas
+
+/* =========================================================
+   CLAMP
+   ========================================================= */
+
+function clamp(
+  value
 ) {
-
-  const canvas =
-    document.createElement("canvas");
-
-  canvas.width =
-    sourceCanvas.width;
-
-  canvas.height =
-    sourceCanvas.height;
-
-  const ctx =
-    canvas.getContext(
-      "2d",
-      {
-        willReadFrequently: true
-      }
-    );
-
-  ctx.drawImage(
-    sourceCanvas,
-    0,
-    0
-  );
-
-  const imageData =
-    ctx.getImageData(
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-
-  const data =
-    imageData.data;
-
-  for (
-    let i = 0;
-    i < data.length;
-    i += 4
-  ) {
-
-    const gray =
-      0.299 * data[i] +
-      0.587 * data[i + 1] +
-      0.114 * data[i + 2];
-
-    data[i] = gray;
-    data[i + 1] = gray;
-    data[i + 2] = gray;
-  }
-
-  ctx.putImageData(
-    imageData,
-    0,
-    0
-  );
-
-  return canvas.toDataURL(
-    "image/jpeg",
-    0.92
-  );
-}
-
-function clamp(value) {
 
   return Math.max(
     0,
     Math.min(
       255,
-      Math.round(value)
+      Math.round(
+        value
+      )
     )
   );
+
 }
+
 
 /* =========================================================
    START OCR
@@ -758,11 +1050,20 @@ async function startOCR(
     return;
   }
 
-  ocrRunning = true;
+
+  ocrRunning =
+    true;
+
 
   try {
 
-    await createOCRWorkers();
+    /*
+      เตรียม worker เดียว
+    */
+
+    const worker =
+      await getOCRWorker();
+
 
     showLoading(
       fromCamera
@@ -770,96 +1071,151 @@ async function startOCR(
         : "กำลังอ่านตัวอักษรจากรูป..."
     );
 
+
     const variants =
       await prepareImage(
         file,
         fromCamera
       );
 
-    let finalText = "";
 
     /*
       ======================================================
-      CAMERA
+      รอบที่ 1
+      อ่านภาพปกติ
       ======================================================
-
-      กล้องใช้ 3 OCR หลัก:
-
-      1. Mixed Thai+English
-      2. Thai
-      3. English
-
-      แต่ละตัวใช้แค่ PSM 6
-      และใช้ภาพ normal เป็นหลัก
-
-      ถ้าผลไม่ดีค่อยลอง enhanced
-      แทนที่จะยิงทุกอย่างพร้อมกัน
     */
 
-    if (fromCamera) {
-
-      finalText =
-        await fastCameraOCR(
-          variants
-        );
-
-    } else {
-
-      finalText =
-        await fastGalleryOCR(
-          variants
-        );
-
-    }
-
-    if (!finalText) {
-
-      throw new Error(
-        "ไม่พบข้อความในรูปภาพ"
+    const first =
+      await recognizeImage(
+        worker,
+        variants.normal
       );
+
+
+    let finalText =
+      first?.text
+        ? normalizeOCRText(
+            first.text
+          )
+        : "";
+
+
+    /*
+      ถ้าอ่านได้ดีแล้ว
+      ไม่ต้อง OCR ซ้ำ
+    */
+
+    if (
+      !isGoodOCR(
+        finalText
+      )
+    ) {
+
+      /*
+        ====================================================
+        รอบที่ 2
+        ใช้ภาพปรับ contrast
+        เฉพาะตอนผลรอบแรกไม่ดี
+        ====================================================
+      */
+
+      showLoading(
+        "กำลังปรับภาพเพื่ออ่านข้อความ..."
+      );
+
+
+      const second =
+        await recognizeImage(
+          worker,
+          variants.enhanced
+        );
+
+
+      const enhancedText =
+        second?.text
+          ? normalizeOCRText(
+              second.text
+            )
+          : "";
+
+
+      if (
+        scoreOCR(
+          enhancedText
+        ) >
+        scoreOCR(
+          finalText
+        )
+      ) {
+
+        finalText =
+          enhancedText;
+
+      }
+
     }
+
 
     finalText =
       cleanFinalOCRText(
         finalText
       );
 
+
     if (!finalText) {
 
       throw new Error(
-        "อ่านข้อความจากรูปไม่สำเร็จ"
+        "ไม่พบข้อความในรูปภาพ"
       );
+
     }
 
-    if (ocrText) {
-      ocrText.value =
-        finalText;
-    }
-
-    if (ocrCard) {
-      ocrCard.hidden =
-        false;
-    }
 
     /*
-      แสดง OCR ให้ผู้ใช้เห็น
-      แล้วแปลเฉพาะภาษาต้นทาง
+      แสดง OCR
+    */
+
+    if (ocrText) {
+
+      ocrText.value =
+        finalText;
+
+    }
+
+
+    if (ocrCard) {
+
+      ocrCard.hidden =
+        false;
+
+    }
+
+
+    /*
+      ======================================================
+      แปลเฉพาะภาษาต้นทาง
+      ======================================================
     */
 
     showLoading(
       "อ่านข้อความได้แล้ว กำลังแปล..."
     );
 
+
     await autoTranslateOCR(
       finalText
     );
 
+
     hideLoading();
+
 
     showStatus(
       "อ่านและแปลเรียบร้อยแล้ว",
       "success"
     );
+
 
   } catch (error) {
 
@@ -868,7 +1224,9 @@ async function startOCR(
       error
     );
 
+
     hideLoading();
+
 
     showStatus(
       error.message ||
@@ -876,415 +1234,157 @@ async function startOCR(
       "error"
     );
 
+
   } finally {
 
-    ocrRunning = false;
+    ocrRunning =
+      false;
+
   }
+
 }
+
 
 /* =========================================================
-   FAST CAMERA OCR
+   RECOGNIZE IMAGE
    ========================================================= */
 
-async function fastCameraOCR(
-  variants
+async function recognizeImage(
+  worker,
+  image
 ) {
 
-  /*
-    รอบแรก:
-    Mixed OCR จากภาพปกติ
-  */
-
-  const mixedNormal =
-    await recognizeImage(
-      mixedWorker,
-      variants.normal,
-      6
-    );
-
-  const mixedText =
-    mixedNormal?.text
-      ? normalizeOCRText(
-          mixedNormal.text
-        )
-      : "";
-
-  /*
-    ถ้า Mixed อ่านได้ดีอยู่แล้ว
-    ใช้เลย ไม่ต้องเสียเวลายิงเพิ่ม
-  */
-
-  if (
-    isGoodMixedOCR(
-      mixedText
-    )
-  ) {
-
-    return mixedText;
+  if (!worker) {
+    return null;
   }
 
-  /*
-    ถ้าผล Mixed ยังไม่ดี
-    ค่อยแยกภาษา
-  */
 
-  showLoading(
-    "กำลังตรวจภาษาไทยและอังกฤษ..."
-  );
+  try {
 
-  const thaiResult =
-    await recognizeImage(
-      thaiWorker,
-      variants.normal,
-      6
+    await worker.setParameters({
+
+      tessedit_pageseg_mode:
+        "6",
+
+      preserve_interword_spaces:
+        "1"
+
+    });
+
+  } catch (error) {
+
+    console.warn(
+      "OCR parameter:",
+      error
     );
 
-  const englishResult =
-    await recognizeImage(
-      englishWorker,
-      variants.normal,
-      6
-    );
-
-  const thaiText =
-    thaiResult?.text
-      ? filterOCRByLanguage(
-          normalizeOCRText(
-            thaiResult.text
-          ),
-          "th"
-        )
-      : "";
-
-  const englishText =
-    englishResult?.text
-      ? filterOCRByLanguage(
-          normalizeOCRText(
-            englishResult.text
-          ),
-          "en"
-        )
-      : "";
-
-  /*
-    ถ้าแยกภาษาได้ทั้งคู่
-    ใช้การรวมแบบเร็ว
-  */
-
-  if (
-    thaiText &&
-    englishText
-  ) {
-
-    const merged =
-      mergeFastLanguageOCR(
-        thaiText,
-        englishText
-      );
-
-    if (merged) {
-      return merged;
-    }
   }
 
-  /*
-    ถ้ายังไม่ได้
-    ลอง enhanced แค่ครั้งเดียว
-  */
 
-  showLoading(
-    "กำลังปรับภาพเพื่ออ่านข้อความ..."
-  );
-
-  const enhanced =
-    await recognizeImage(
-      mixedWorker,
-      variants.enhanced,
-      6
+  const result =
+    await worker.recognize(
+      image
     );
 
-  if (
-    enhanced?.text
-  ) {
 
-    const text =
-      normalizeOCRText(
-        enhanced.text
-      );
+  return result?.data || null;
 
-    if (text) {
-      return text;
-    }
-  }
-
-  /*
-    fallback
-  */
-
-  return (
-    mixedText ||
-    thaiText ||
-    englishText ||
-    ""
-  );
 }
 
-/* =========================================================
-   FAST GALLERY OCR
-   ========================================================= */
-
-async function fastGalleryOCR(
-  variants
-) {
-
-  /*
-    Gallery ใช้ Mixed ก่อน
-    เพราะภาพจาก gallery มักชัดกว่า
-  */
-
-  const normal =
-    await recognizeImage(
-      mixedWorker,
-      variants.normal,
-      6
-    );
-
-  const normalText =
-    normal?.text
-      ? normalizeOCRText(
-          normal.text
-        )
-      : "";
-
-  if (
-    isGoodMixedOCR(
-      normalText
-    )
-  ) {
-
-    return normalText;
-  }
-
-  /*
-    ลอง enhanced แค่ครั้งเดียว
-  */
-
-  const enhanced =
-    await recognizeImage(
-      mixedWorker,
-      variants.enhanced,
-      6
-    );
-
-  const enhancedText =
-    enhanced?.text
-      ? normalizeOCRText(
-          enhanced.text
-        )
-      : "";
-
-  if (
-    enhancedText &&
-    scoreOCRText(
-      enhancedText
-    ) >
-    scoreOCRText(
-      normalText
-    )
-  ) {
-
-    return enhancedText;
-  }
-
-  /*
-    ถ้ารูปมีภาษาต้นทางชัดเจน
-    ใช้ source worker เป็น fallback
-  */
-
-  const sourceWorker =
-    sourceLanguage === "th"
-      ? thaiWorker
-      : englishWorker;
-
-  const sourceResult =
-    await recognizeImage(
-      sourceWorker,
-      variants.normal,
-      6
-    );
-
-  const sourceText =
-    sourceResult?.text
-      ? filterOCRByLanguage(
-          normalizeOCRText(
-            sourceResult.text
-          ),
-          sourceLanguage
-        )
-      : "";
-
-  return (
-    enhancedText ||
-    sourceText ||
-    normalText ||
-    ""
-  );
-}
-
-/* =========================================================
-   FAST MERGE
-   ========================================================= */
-
-function mergeFastLanguageOCR(
-  thaiText,
-  englishText
-) {
-
-  const thaiLines =
-    thaiText
-      .split("\n")
-      .map(
-        line => line.trim()
-      )
-      .filter(Boolean);
-
-  const englishLines =
-    englishText
-      .split("\n")
-      .map(
-        line => line.trim()
-      )
-      .filter(Boolean);
-
-  if (
-    !thaiLines.length &&
-    !englishLines.length
-  ) {
-    return "";
-  }
-
-  /*
-    ถ้ารูปมีภาษาเดียว
-  */
-
-  if (!thaiLines.length) {
-    return englishLines.join("\n");
-  }
-
-  if (!englishLines.length) {
-    return thaiLines.join("\n");
-  }
-
-  /*
-    ถ้ามีจำนวนบรรทัดเท่ากัน
-    ให้เรียงตามรูปแบบภาษาต้นทาง
-  */
-
-  const result = [];
-
-  if (
-    thaiLines.length ===
-    englishLines.length
-  ) {
-
-    for (
-      let i = 0;
-      i < thaiLines.length;
-      i++
-    ) {
-
-      if (
-        sourceLanguage === "th"
-      ) {
-
-        result.push(
-          thaiLines[i]
-        );
-
-        result.push(
-          englishLines[i]
-        );
-
-      } else {
-
-        result.push(
-          englishLines[i]
-        );
-
-        result.push(
-          thaiLines[i]
-        );
-      }
-    }
-
-  } else {
-
-    /*
-      จำนวนบรรทัดต่างกัน
-      รวมทั้งหมดโดยไม่ทิ้งข้อความ
-    */
-
-    result.push(
-      ...thaiLines
-    );
-
-    result.push(
-      ...englishLines
-    );
-  }
-
-  return result.join("\n");
-}
 
 /* =========================================================
    OCR QUALITY
    ========================================================= */
 
-function isGoodMixedOCR(text) {
+function isGoodOCR(
+  text
+) {
 
   if (!text) {
     return false;
   }
 
-  const score =
-    scoreOCRText(text);
 
   const thai =
-    countThai(text);
+    countThai(
+      text
+    );
+
 
   const english =
-    countEnglish(text);
+    countEnglish(
+      text
+    );
 
-  /*
-    ต้องมีตัวอักษรจริง
-  */
+
+  const total =
+    thai +
+    english;
+
 
   if (
-    thai +
-    english <
-    4
+    total < 5
   ) {
+
     return false;
+
   }
 
-  return score >= 45;
+
+  return (
+    scoreOCR(
+      text
+    ) >= 45
+  );
+
 }
 
-function scoreOCRText(text) {
+
+function scoreOCR(
+  text
+) {
 
   if (!text) {
     return 0;
   }
 
+
   const thai =
-    countThai(text);
+    countThai(
+      text
+    );
+
 
   const english =
-    countEnglish(text);
+    countEnglish(
+      text
+    );
+
 
   const letters =
     thai +
     english;
+
+
+  const length =
+    text.replace(
+      /\s/g,
+      ""
+    ).length;
+
+
+  if (!length) {
+    return 0;
+  }
+
+
+  const valid =
+    (
+      text.match(
+        /[A-Za-zก-๙0-9\s.,!?'"“”‘’\-:;()]/g
+      ) || []
+    ).length;
+
 
   const garbage =
     (
@@ -1293,15 +1393,6 @@ function scoreOCRText(text) {
       ) || []
     ).length;
 
-  const length =
-    text.replace(
-      /\s/g,
-      ""
-    ).length;
-
-  if (!length) {
-    return 0;
-  }
 
   let score =
     Math.min(
@@ -1309,26 +1400,33 @@ function scoreOCRText(text) {
       letters * 2
     );
 
-  score +=
-    Math.min(
-      25,
-      text.split("\n").length * 5
-    );
 
   score +=
     Math.min(
-      20,
-      (
-        letters /
-        length
-      ) * 20
+      25,
+      text
+        .split("\n")
+        .filter(Boolean)
+        .length * 5
     );
+
+
+  score +=
+    (
+      valid /
+      Math.max(
+        1,
+        text.length
+      )
+    ) * 20;
+
 
   score -=
     Math.min(
       25,
       garbage * 2
     );
+
 
   return Math.max(
     0,
@@ -1337,82 +1435,67 @@ function scoreOCRText(text) {
       score
     )
   );
+
 }
 
-/* =========================================================
-   RECOGNIZE
-   ========================================================= */
-
-async function recognizeImage(
-  worker,
-  image,
-  psm = 6
-) {
-
-  if (!worker) {
-    return null;
-  }
-
-  try {
-
-    await worker.setParameters({
-      tessedit_pageseg_mode:
-        String(psm),
-
-      preserve_interword_spaces:
-        "1"
-    });
-
-  } catch (error) {
-
-    console.warn(
-      "Tesseract parameter warning:",
-      error
-    );
-  }
-
-  const result =
-    await worker.recognize(
-      image
-    );
-
-  return result?.data || null;
-}
 
 /* =========================================================
    NORMALIZE OCR
    ========================================================= */
 
-function normalizeOCRText(text) {
+function normalizeOCRText(
+  text
+) {
 
   if (!text) {
     return "";
   }
 
+
   const lines =
     String(text)
-      .replace(/\r/g, "\n")
-      .replace(/\u0000/g, "")
+      .replace(
+        /\r/g,
+        "\n"
+      )
+      .replace(
+        /\u0000/g,
+        ""
+      )
       .split("\n")
       .map(
         line =>
-          cleanOCRLine(line)
+          cleanOCRLine(
+            line
+          )
       )
       .filter(Boolean);
 
-  return lines.join("\n").trim();
+
+  return lines.join(
+    "\n"
+  ).trim();
+
 }
 
-function cleanOCRLine(line) {
+
+function cleanOCRLine(
+  line
+) {
 
   let value =
     String(line)
-      .replace(/\uFFFD/g, "")
+      .replace(
+        /\uFFFD/g,
+        ""
+      )
       .trim();
+
 
   if (!value) {
     return "";
   }
+
 
   value =
     value
@@ -1437,54 +1520,79 @@ function cleanOCRLine(line) {
         " "
       );
 
+
   return value.trim();
+
 }
 
+
 /* =========================================================
-   FINAL OCR
+   FINAL OCR CLEAN
    ========================================================= */
 
-function cleanFinalOCRText(text) {
+function cleanFinalOCRText(
+  text
+) {
 
   const value =
-    normalizeOCRText(text);
+    normalizeOCRText(
+      text
+    );
+
 
   if (!value) {
     return "";
   }
 
+
   const lines =
     value
       .split("\n")
       .map(
-        line => line.trim()
+        line =>
+          line.trim()
       )
       .filter(Boolean);
 
-  const result =
+
+  const cleaned =
     lines.filter(
       line =>
-        !isGarbageLine(line)
+        !isGarbageLine(
+          line
+        )
     );
 
+
   return (
-    result.length
-      ? result
+    cleaned.length
+      ? cleaned
       : lines
   ).join("\n");
+
 }
 
-function isGarbageLine(line) {
+
+function isGarbageLine(
+  line
+) {
 
   if (!line) {
     return true;
   }
 
+
   const thai =
-    countThai(line);
+    countThai(
+      line
+    );
+
 
   const english =
-    countEnglish(line);
+    countEnglish(
+      line
+    );
+
 
   const numbers =
     (
@@ -1493,6 +1601,7 @@ function isGarbageLine(line) {
       ) || []
     ).length;
 
+
   const symbols =
     (
       line.match(
@@ -1500,38 +1609,55 @@ function isGarbageLine(line) {
       ) || []
     ).length;
 
+
   const letters =
     thai +
     english;
+
 
   if (
     letters === 0 &&
     numbers === 0
   ) {
+
     return true;
+
   }
+
 
   if (
     letters < 2 &&
     symbols > 4
   ) {
+
     return true;
+
   }
+
 
   if (
-    /(.)\1{7,}/u.test(line)
+    /(.)\1{7,}/u.test(
+      line
+    )
   ) {
+
     return true;
+
   }
 
+
   return false;
+
 }
+
 
 /* =========================================================
    LANGUAGE COUNT
    ========================================================= */
 
-function countThai(text) {
+function countThai(
+  text
+) {
 
   return (
     String(text)
@@ -1539,9 +1665,13 @@ function countThai(text) {
         /[ก-๙]/g
       ) || []
   ).length;
+
 }
 
-function countEnglish(text) {
+
+function countEnglish(
+  text
+) {
 
   return (
     String(text)
@@ -1549,119 +1679,9 @@ function countEnglish(text) {
         /[A-Za-z]/g
       ) || []
   ).length;
+
 }
 
-function filterOCRByLanguage(
-  text,
-  language
-) {
-
-  const lines =
-    String(text)
-      .split("\n")
-      .map(
-        line => line.trim()
-      )
-      .filter(Boolean);
-
-  const result = [];
-
-  for (
-    const line
-    of lines
-  ) {
-
-    const thai =
-      countThai(line);
-
-    const english =
-      countEnglish(line);
-
-    if (
-      language === "th"
-    ) {
-
-      if (
-        thai >= 2 &&
-        thai >= english
-      ) {
-        result.push(line);
-      }
-
-    } else {
-
-      if (
-        english >= 2 &&
-        english >= thai
-      ) {
-
-        result.push(line);
-      }
-    }
-  }
-
-  return result.join("\n");
-}
-
-/* =========================================================
-   AUTO TRANSLATE OCR
-   ========================================================= */
-
-async function autoTranslateOCR(
-  text
-) {
-
-  if (!text?.trim()) {
-    return;
-  }
-
-  translationRunning = true;
-
-  try {
-
-    const sourceText =
-      extractSourceText(
-        text,
-        sourceLanguage
-      );
-
-    if (!sourceText) {
-
-      if (resultText) {
-
-        resultText.textContent =
-          "ไม่พบข้อความภาษาต้นทาง";
-
-        resultText.classList.remove(
-          "empty"
-        );
-      }
-
-      return;
-    }
-
-    const translated =
-      await translateSingleText(
-        sourceText,
-        sourceLanguage,
-        targetLanguage
-      );
-
-    if (resultText) {
-
-      resultText.textContent =
-        translated;
-
-      resultText.classList.remove(
-        "empty"
-      );
-    }
-
-  } finally {
-
-    translationRunning = false;
-  }
-}
 
 /* =========================================================
    SOURCE TEXT
@@ -1676,9 +1696,11 @@ function extractSourceText(
     String(text)
       .split("\n")
       .map(
-        line => line.trim()
+        line =>
+          line.trim()
       )
       .filter(Boolean);
+
 
   const result =
     lines.filter(
@@ -1689,8 +1711,13 @@ function extractSourceText(
         )
     );
 
-  return result.join("\n");
+
+  return result.join(
+    "\n"
+  );
+
 }
+
 
 function isSourceLine(
   text,
@@ -1698,10 +1725,16 @@ function isSourceLine(
 ) {
 
   const thai =
-    countThai(text);
+    countThai(
+      text
+    );
+
 
   const english =
-    countEnglish(text);
+    countEnglish(
+      text
+    );
+
 
   if (
     source === "th"
@@ -1711,7 +1744,9 @@ function isSourceLine(
       thai >= 2 &&
       thai >= english
     );
+
   }
+
 
   if (
     source === "en"
@@ -1721,27 +1756,119 @@ function isSourceLine(
       english < 2 ||
       english < thai
     ) {
+
       return false;
+
     }
 
+
     /*
-      ป้องกันกรณี OCR อ่าน
-      English + ไทยปนกัน
-      เช่น "It's only หอน"
+      ป้องกัน OCR เช่น
+
+      It's only หอน
+
+      ไม่ให้เอาทั้งบรรทัด
+      ไปแปลเป็นอังกฤษ
     */
 
     if (
       thai > 0 &&
-      thai >= english * 0.30
+      thai >=
+        english * 0.30
     ) {
+
       return false;
+
     }
 
+
     return true;
+
   }
 
+
   return false;
+
 }
+
+
+/* =========================================================
+   AUTO TRANSLATE OCR
+   ========================================================= */
+
+async function autoTranslateOCR(
+  text
+) {
+
+  if (
+    !text ||
+    !text.trim()
+  ) {
+
+    return;
+
+  }
+
+
+  translationRunning =
+    true;
+
+
+  try {
+
+    const sourceText =
+      extractSourceText(
+        text,
+        sourceLanguage
+      );
+
+
+    if (!sourceText) {
+
+      if (resultText) {
+
+        resultText.textContent =
+          "ไม่พบข้อความภาษาต้นทาง";
+
+        resultText.classList.remove(
+          "empty"
+        );
+
+      }
+
+      return;
+
+    }
+
+
+    const translated =
+      await translateSingleText(
+        sourceText,
+        sourceLanguage,
+        targetLanguage
+      );
+
+
+    if (resultText) {
+
+      resultText.textContent =
+        translated;
+
+      resultText.classList.remove(
+        "empty"
+      );
+
+    }
+
+  } finally {
+
+    translationRunning =
+      false;
+
+  }
+
+}
+
 
 /* =========================================================
    TRANSLATE API
@@ -1757,7 +1884,8 @@ async function translateSingleText(
     await fetch(
       TRANSLATE_API,
       {
-        method: "POST",
+        method:
+          "POST",
 
         headers: {
           "Content-Type":
@@ -1766,35 +1894,55 @@ async function translateSingleText(
 
         body:
           JSON.stringify({
-            action: "translate",
-            text: text,
-            source: source,
-            target: target
+
+            action:
+              "translate",
+
+            text:
+              text,
+
+            source:
+              source,
+
+            target:
+              target
+
           })
       }
     );
+
 
   if (!response.ok) {
 
     throw new Error(
       `เซิร์ฟเวอร์ตอบกลับ ${response.status}`
     );
+
   }
+
 
   const raw =
     await response.text();
 
-  let data = null;
+
+  let data =
+    null;
+
 
   try {
 
     data =
-      JSON.parse(raw);
+      JSON.parse(
+        raw
+      );
 
   } catch {
 
-    data = null;
+    data =
+      null;
+
   }
+
 
   const translated =
     extractTranslation(
@@ -1802,15 +1950,20 @@ async function translateSingleText(
       raw
     );
 
+
   if (!translated) {
 
     throw new Error(
       "ไม่พบคำแปลจากเซิร์ฟเวอร์"
     );
+
   }
 
+
   return translated.trim();
+
 }
+
 
 /* =========================================================
    MANUAL TRANSLATE
@@ -1818,14 +1971,20 @@ async function translateSingleText(
 
 async function translateText() {
 
-  if (translationRunning) {
+  if (
+    translationRunning
+  ) {
+
     return;
+
   }
+
 
   const text =
     inputText
       ? inputText.value.trim()
       : "";
+
 
   if (!text) {
 
@@ -1835,9 +1994,13 @@ async function translateText() {
     );
 
     return;
+
   }
 
-  translationRunning = true;
+
+  translationRunning =
+    true;
+
 
   try {
 
@@ -1845,8 +2008,9 @@ async function translateText() {
       "กำลังแปลภาษา..."
     );
 
+
     /*
-      ข้อความที่ผู้ใช้พิมพ์เอง
+      ข้อความที่พิมพ์เอง
       แปลทั้งหมด
     */
 
@@ -1857,6 +2021,7 @@ async function translateText() {
         targetLanguage
       );
 
+
     if (resultText) {
 
       resultText.textContent =
@@ -1865,14 +2030,18 @@ async function translateText() {
       resultText.classList.remove(
         "empty"
       );
+
     }
 
+
     hideLoading();
+
 
     showStatus(
       "แปลภาษาเรียบร้อยแล้ว",
       "success"
     );
+
 
   } catch (error) {
 
@@ -1881,7 +2050,9 @@ async function translateText() {
       error
     );
 
+
     hideLoading();
+
 
     showStatus(
       error.message ||
@@ -1889,11 +2060,16 @@ async function translateText() {
       "error"
     );
 
+
   } finally {
 
-    translationRunning = false;
+    translationRunning =
+      false;
+
   }
+
 }
+
 
 /* =========================================================
    EXTRACT TRANSLATION
@@ -1907,6 +2083,7 @@ function extractTranslation(
   if (data) {
 
     const keys = [
+
       "translation",
       "translatedText",
       "result",
@@ -1914,7 +2091,9 @@ function extractTranslation(
       "output",
       "translated",
       "data"
+
     ];
+
 
     for (
       const key
@@ -1924,18 +2103,24 @@ function extractTranslation(
       const value =
         data[key];
 
+
       if (
-        typeof value === "string" &&
+        typeof value ===
+          "string" &&
         value.trim()
       ) {
 
         return value.trim();
+
       }
+
     }
+
 
     if (
       data.data &&
-      typeof data.data === "object"
+      typeof data.data ===
+        "object"
     ) {
 
       for (
@@ -1946,36 +2131,54 @@ function extractTranslation(
         const value =
           data.data[key];
 
+
         if (
-          typeof value === "string" &&
+          typeof value ===
+            "string" &&
           value.trim()
         ) {
 
           return value.trim();
+
         }
+
       }
+
     }
+
   }
 
+
   if (
-    typeof raw === "string" &&
+    typeof raw ===
+      "string" &&
     raw.trim()
   ) {
 
     const value =
       raw.trim();
 
+
     if (
-      !value.startsWith("<!DOCTYPE") &&
-      !value.startsWith("<html")
+      !value.startsWith(
+        "<!DOCTYPE"
+      ) &&
+      !value.startsWith(
+        "<html"
+      )
     ) {
 
       return value;
+
     }
+
   }
 
+
   return "";
+
 }
+
 
 /* =========================================================
    USE OCR
@@ -1983,12 +2186,19 @@ function extractTranslation(
 
 function useOCRText() {
 
-  if (!ocrText || !inputText) {
+  if (
+    !ocrText ||
+    !inputText
+  ) {
+
     return;
+
   }
+
 
   const text =
     ocrText.value.trim();
+
 
   if (!text) {
 
@@ -1998,27 +2208,35 @@ function useOCRText() {
     );
 
     return;
+
   }
+
 
   inputText.value =
     text;
+
 
   showStatus(
     "นำข้อความจากรูปมาใช้แล้ว",
     "success"
   );
+
 }
 
+
 /* =========================================================
-   SPEAK
+   SPEECH
    ========================================================= */
 
-function speakText(text) {
+function speakText(
+  text
+) {
 
   const value =
     String(
       text || ""
     ).trim();
+
 
   if (!value) {
 
@@ -2028,7 +2246,9 @@ function speakText(text) {
     );
 
     return;
+
   }
+
 
   if (
     !("speechSynthesis" in window)
@@ -2040,27 +2260,39 @@ function speakText(text) {
     );
 
     return;
+
   }
 
+
   window.speechSynthesis.cancel();
+
 
   const utterance =
     new SpeechSynthesisUtterance(
       value
     );
 
+
   utterance.lang =
     targetLanguage === "th"
       ? "th-TH"
       : "en-US";
 
-  utterance.rate = 0.9;
-  utterance.pitch = 1;
+
+  utterance.rate =
+    0.9;
+
+
+  utterance.pitch =
+    1;
+
 
   window.speechSynthesis.speak(
     utterance
   );
+
 }
+
 
 /* =========================================================
    COPY
@@ -2073,9 +2305,12 @@ async function copyResult() {
       ? resultText.textContent.trim()
       : "";
 
+
   if (
     !value ||
-    resultText.classList.contains("empty")
+    resultText.classList.contains(
+      "empty"
+    )
   ) {
 
     showStatus(
@@ -2084,7 +2319,9 @@ async function copyResult() {
     );
 
     return;
+
   }
+
 
   try {
 
@@ -2092,10 +2329,12 @@ async function copyResult() {
       value
     );
 
+
     showStatus(
       "คัดลอกคำแปลแล้ว",
       "success"
     );
+
 
   } catch {
 
@@ -2104,25 +2343,36 @@ async function copyResult() {
         "textarea"
       );
 
+
     textarea.value =
       value;
+
 
     document.body.appendChild(
       textarea
     );
 
+
     textarea.select();
 
-    document.execCommand("copy");
+
+    document.execCommand(
+      "copy"
+    );
+
 
     textarea.remove();
+
 
     showStatus(
       "คัดลอกคำแปลแล้ว",
       "success"
     );
+
   }
+
 }
+
 
 /* =========================================================
    CLEAR
@@ -2131,8 +2381,12 @@ async function copyResult() {
 function clearInput() {
 
   if (inputText) {
-    inputText.value = "";
+
+    inputText.value =
+      "";
+
   }
+
 
   if (resultText) {
 
@@ -2142,53 +2396,83 @@ function clearInput() {
     resultText.classList.add(
       "empty"
     );
+
   }
+
 
   if (ocrText) {
-    ocrText.value = "";
+
+    ocrText.value =
+      "";
+
   }
+
 
   if (ocrCard) {
-    ocrCard.hidden = true;
+
+    ocrCard.hidden =
+      true;
+
   }
 
+
   removeImage();
+
 
   showStatus(
     "ล้างข้อมูลแล้ว",
     "success"
   );
+
 }
+
 
 /* =========================================================
    LOADING
    ========================================================= */
 
-function showLoading(message) {
+function showLoading(
+  message
+) {
 
   if (loadingBox) {
-    loadingBox.hidden = false;
+
+    loadingBox.hidden =
+      false;
+
   }
 
+
   if (loadingText) {
+
     loadingText.textContent =
       message ||
       "กำลังดำเนินการ...";
+
   }
+
 }
+
 
 function hideLoading() {
 
   if (loadingBox) {
-    loadingBox.hidden = true;
+
+    loadingBox.hidden =
+      true;
+
   }
+
 }
+
 
 /* =========================================================
    STATUS
    ========================================================= */
 
-let statusTimer = null;
+let statusTimer =
+  null;
+
 
 function showStatus(
   message,
@@ -2199,26 +2483,37 @@ function showStatus(
     return;
   }
 
+
   statusMessage.textContent =
     message;
 
-  statusMessage.hidden = false;
+
+  statusMessage.hidden =
+    false;
+
 
   statusMessage.className =
     `status-message ${type}`;
+
 
   clearTimeout(
     statusTimer
   );
 
+
   statusTimer =
     setTimeout(
       () => {
-        statusMessage.hidden = true;
+
+        statusMessage.hidden =
+          true;
+
       },
       3500
     );
+
 }
+
 
 /* =========================================================
    CLEANUP
@@ -2226,13 +2521,35 @@ function showStatus(
 
 window.addEventListener(
   "beforeunload",
-  () => {
+  async () => {
 
     if (selectedImageUrl) {
 
       URL.revokeObjectURL(
         selectedImageUrl
       );
+
+    }
+
+
+    try {
+
+      if (ocrWorker) {
+
+        await ocrWorker.terminate();
+
+        ocrWorker =
+          null;
+
+      }
+
+    } catch (error) {
+
+      console.warn(
+        "OCR worker cleanup:",
+        error
+      );
+
     }
 
   }
