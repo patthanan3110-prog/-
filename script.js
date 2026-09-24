@@ -1,8 +1,8 @@
 /* =========================================================
    ผู้ช่วยแปลภาษา
    Thai ↔ English
-   SCRIPT.JS - VERSION 59
-   OCR + TRANSLATION API FIX
+   SCRIPT.JS - VERSION 60
+   OCR CONFIDENCE + SMART LINE FILTER
    ========================================================= */
 
 "use strict";
@@ -982,25 +982,33 @@ async function startOCR(
         fromCamera
       );
 
-    const first =
+    /*
+      รอบแรก:
+      ใช้ภาพปกติก่อน
+    */
+
+    const firstData =
       await recognizeImage(
         worker,
         variants.normal
       );
 
-    let firstText =
-      first?.text
-        ? normalizeOCRText(
-            first.text
-          )
-        : "";
+    const firstLines =
+      extractOCRLines(
+        firstData
+      );
 
-    let finalText =
-      firstText;
+    let finalLines =
+      firstLines;
+
+    /*
+      ถ้ารอบแรกคุณภาพต่ำ
+      จึงค่อยใช้ภาพปรับความคมชัด
+    */
 
     if (
-      !isGoodOCR(
-        firstText
+      !isGoodOCRLines(
+        firstLines
       )
     ) {
 
@@ -1008,37 +1016,41 @@ async function startOCR(
         "กำลังปรับภาพเพื่ออ่านข้อความ..."
       );
 
-      const second =
+      const secondData =
         await recognizeImage(
           worker,
           variants.enhanced
         );
 
-      const secondText =
-        second?.text
-          ? normalizeOCRText(
-              second.text
-            )
-          : "";
-
-      finalText =
-        chooseBetterOCRText(
-          firstText,
-          secondText
+      const secondLines =
+        extractOCRLines(
+          secondData
         );
 
-    } else {
-
-      finalText =
-        cleanFinalOCRText(
-          firstText
+      finalLines =
+        chooseBetterOCRLines(
+          firstLines,
+          secondLines
         );
 
     }
 
-    finalText =
-      cleanFinalOCRText(
-        finalText
+    /*
+      กรองรอบสุดท้าย
+    */
+
+    finalLines =
+      finalLines
+        .filter(
+          line =>
+            isUsableOCRLine(
+              line
+            )
+        );
+
+    const finalText =
+      ocrLinesToText(
+        finalLines
       );
 
     if (!finalText) {
@@ -1148,265 +1160,216 @@ async function recognizeImage(
 
 
 /* =========================================================
-   CHOOSE BETTER OCR
+   EXTRACT OCR LINES
    ========================================================= */
 
-function chooseBetterOCRText(
-  first,
-  second
+function extractOCRLines(
+  data
 ) {
 
-  const a =
-    cleanFinalOCRText(
-      first
-    );
-
-  const b =
-    cleanFinalOCRText(
-      second
-    );
-
-  if (!a) {
-    return b;
+  if (!data) {
+    return [];
   }
 
-  if (!b) {
-    return a;
-  }
-
-  const scoreA =
-    scoreOCR(
-      a
-    );
-
-  const scoreB =
-    scoreOCR(
-      b
-    );
+  /*
+    Tesseract.js 5
+    มี data.lines
+  */
 
   if (
-    scoreB >
-    scoreA + 5
+    Array.isArray(
+      data.lines
+    ) &&
+    data.lines.length
   ) {
 
-    return b;
-
-  }
-
-  if (
-    scoreA >
-    scoreB + 5
-  ) {
-
-    return a;
-
-  }
-
-  return mergeBestOCRLines(
-    a,
-    b
-  );
-
-}
-
-
-/* =========================================================
-   MERGE BEST OCR LINES
-   ========================================================= */
-
-function mergeBestOCRLines(
-  first,
-  second
-) {
-
-  const firstLines =
-    first
-      .split("\n")
+    return data.lines
       .map(
+        line => {
+
+          const text =
+            cleanOCRLine(
+              line?.text || ""
+            );
+
+          const confidence =
+            getLineConfidence(
+              line
+            );
+
+          return {
+
+            text:
+              text,
+
+            confidence:
+              confidence
+
+          };
+
+        }
+      )
+      .filter(
         line =>
-          line.trim()
-      )
-      .filter(Boolean);
-
-  const secondLines =
-    second
-      .split("\n")
-      .map(
-        line =>
-          line.trim()
-      )
-      .filter(Boolean);
-
-  if (
-    Math.abs(
-      firstLines.length -
-      secondLines.length
-    ) > 2
-  ) {
-
-    return scoreOCR(
-      first
-    ) >=
-      scoreOCR(
-        second
-      )
-      ? first
-      : second;
+          line.text
+      );
 
   }
 
-  const max =
-    Math.max(
-      firstLines.length,
-      secondLines.length
+  /*
+    fallback
+    ถ้าไม่มี lines
+  */
+
+  const rawText =
+    data.text || "";
+
+  return String(
+    rawText
+  )
+    .replace(
+      /\r/g,
+      "\n"
+    )
+    .split("\n")
+    .map(
+      text => ({
+
+        text:
+          cleanOCRLine(
+            text
+          ),
+
+        confidence:
+          50
+
+      })
+    )
+    .filter(
+      line =>
+        line.text
     );
-
-  const result = [];
-
-  for (
-    let i = 0;
-    i < max;
-    i++
-  ) {
-
-    const a =
-      firstLines[i] ||
-      "";
-
-    const b =
-      secondLines[i] ||
-      "";
-
-    if (
-      !a &&
-      b
-    ) {
-
-      result.push(
-        b
-      );
-
-      continue;
-
-    }
-
-    if (
-      a &&
-      !b
-    ) {
-
-      result.push(
-        a
-      );
-
-      continue;
-
-    }
-
-    const cleanA =
-      cleanOCRCandidateLine(
-        a
-      );
-
-    const cleanB =
-      cleanOCRCandidateLine(
-        b
-      );
-
-    if (!cleanA) {
-
-      if (cleanB) {
-
-        result.push(
-          cleanB
-        );
-
-      }
-
-      continue;
-
-    }
-
-    if (!cleanB) {
-
-      result.push(
-        cleanA
-      );
-
-      continue;
-
-    }
-
-    result.push(
-      chooseBetterOCRLine(
-        cleanA,
-        cleanB
-      )
-    );
-
-  }
-
-  return result.join(
-    "\n"
-  );
 
 }
 
 
 /* =========================================================
-   CHOOSE BETTER LINE
+   LINE CONFIDENCE
    ========================================================= */
 
-function chooseBetterOCRLine(
-  first,
-  second
-) {
-
-  const scoreA =
-    scoreOCRLine(
-      first
-    );
-
-  const scoreB =
-    scoreOCRLine(
-      second
-    );
-
-  return (
-    scoreB >
-    scoreA
-      ? second
-      : first
-  );
-
-}
-
-
-/* =========================================================
-   OCR LINE SCORE
-   ========================================================= */
-
-function scoreOCRLine(
+function getLineConfidence(
   line
 ) {
 
-  if (!line) {
-    return 0;
+  if (
+    line &&
+    Number.isFinite(
+      Number(
+        line.confidence
+      )
+    )
+  ) {
+
+    return Number(
+      line.confidence
+    );
+
   }
+
+  /*
+    บางผลลัพธ์อาจไม่มี
+    confidence ระดับ line
+    จึงคำนวณจาก words
+  */
+
+  if (
+    line &&
+    Array.isArray(
+      line.words
+    ) &&
+    line.words.length
+  ) {
+
+    const values =
+      line.words
+        .map(
+          word =>
+            Number(
+              word?.confidence
+            )
+        )
+        .filter(
+          value =>
+            Number.isFinite(
+              value
+            )
+        );
+
+    if (values.length) {
+
+      return (
+        values.reduce(
+          (
+            total,
+            value
+          ) =>
+            total + value,
+          0
+        ) /
+        values.length
+      );
+
+    }
+
+  }
+
+  return 50;
+
+}
+
+
+/* =========================================================
+   OCR LINE USABILITY
+   ========================================================= */
+
+function isUsableOCRLine(
+  line
+) {
+
+  if (
+    !line ||
+    !line.text
+  ) {
+
+    return false;
+
+  }
+
+  const text =
+    line.text.trim();
+
+  if (!text) {
+    return false;
+  }
+
+  const confidence =
+    Number(
+      line.confidence
+    );
 
   const thai =
     countThai(
-      line
+      text
     );
 
   const english =
     countEnglish(
-      line
+      text
     );
 
   const numbers =
     countNumbers(
-      line
+      text
     );
 
   const letters =
@@ -1415,65 +1378,219 @@ function scoreOCRLine(
     numbers;
 
   const symbols =
-    (
-      line.match(
-        /[^A-Za-zก-๙0-9\s]/g
-      ) || []
-    ).length;
-
-  const length =
-    line.replace(
-      /\s/g,
-      ""
-    ).length;
-
-  if (!length) {
-    return 0;
-  }
-
-  let score =
-    Math.min(
-      60,
-      letters * 3
+    countOCRSymbols(
+      text
     );
 
+  /*
+    ไม่มีตัวอักษร/ตัวเลขเลย
+  */
+
   if (
-    letters >=
-    symbols
+    letters === 0
   ) {
 
-    score +=
-      20;
+    return false;
 
   }
+
+  /*
+    บรรทัดสั้นมากและ confidence ต่ำ
+    เช่น "สอ" ที่เกิดจาก OCR
+  */
+
+  if (
+    letters <= 3 &&
+    confidence < 45
+  ) {
+
+    return false;
+
+  }
+
+  /*
+    บรรทัดสั้น + มีสัญลักษณ์เยอะ
+  */
+
+  if (
+    letters <= 5 &&
+    symbols >= 3 &&
+    confidence < 55
+  ) {
+
+    return false;
+
+  }
+
+  /*
+    confidence ต่ำมาก
+    และข้อความสั้น
+  */
+
+  if (
+    confidence < 25 &&
+    text.length <= 10
+  ) {
+
+    return false;
+
+  }
+
+  /*
+    มีแต่สัญลักษณ์เป็นส่วนใหญ่
+  */
+
+  if (
+    symbols >= 4 &&
+    symbols >= letters &&
+    confidence < 65
+  ) {
+
+    return false;
+
+  }
+
+  return true;
+
+}
+
+
+/* =========================================================
+   OCR SYMBOL COUNT
+   ========================================================= */
+
+function countOCRSymbols(
+  text
+) {
+
+  return (
+    String(text)
+      .match(
+        /[^A-Za-zก-๙0-9\s]/g
+      ) || []
+  ).length;
+
+}
+
+
+/* =========================================================
+   OCR LINES → TEXT
+   ========================================================= */
+
+function ocrLinesToText(
+  lines
+) {
+
+  if (
+    !Array.isArray(
+      lines
+    )
+  ) {
+
+    return "";
+
+  }
+
+  return lines
+    .map(
+      line =>
+        cleanOCRLine(
+          line.text
+        )
+    )
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+
+}
+
+
+/* =========================================================
+   OCR LINE SCORE
+   ========================================================= */
+
+function scoreOCRLineObject(
+  line
+) {
+
+  if (
+    !line ||
+    !line.text
+  ) {
+
+    return 0;
+
+  }
+
+  const text =
+    line.text;
+
+  const confidence =
+    Number(
+      line.confidence
+    ) || 0;
+
+  const thai =
+    countThai(
+      text
+    );
+
+  const english =
+    countEnglish(
+      text
+    );
+
+  const numbers =
+    countNumbers(
+      text
+    );
+
+  const letters =
+    thai +
+    english +
+    numbers;
+
+  const symbols =
+    countOCRSymbols(
+      text
+    );
+
+  let score =
+    confidence;
+
+  /*
+    มีตัวอักษรจริง
+  */
+
+  score +=
+    Math.min(
+      20,
+      letters * 1.5
+    );
+
+  /*
+    มีสัญลักษณ์มากเกินไป
+  */
+
+  if (
+    symbols > letters
+  ) {
+
+    score -=
+      15;
+
+  }
+
+  /*
+    บรรทัดสั้นมาก
+  */
 
   if (
     letters <= 2
   ) {
 
     score -=
-      20;
-
-  }
-
-  if (
-    symbols >= 4 &&
-    symbols >= letters
-  ) {
-
-    score -=
-      35;
-
-  }
-
-  if (
-    thai > 0 &&
-    english > 0 &&
-    letters >= 5
-  ) {
-
-    score +=
-      5;
+      15;
 
   }
 
@@ -1489,12 +1606,282 @@ function scoreOCRLine(
 
 
 /* =========================================================
+   CHOOSE BETTER OCR LINES
+   ========================================================= */
+
+function chooseBetterOCRLines(
+  first,
+  second
+) {
+
+  const a =
+    Array.isArray(first)
+      ? first.filter(
+          isUsableOCRLine
+        )
+      : [];
+
+  const b =
+    Array.isArray(second)
+      ? second.filter(
+          isUsableOCRLine
+        )
+      : [];
+
+  if (!a.length) {
+    return b;
+  }
+
+  if (!b.length) {
+    return a;
+  }
+
+  /*
+    ถ้าจำนวนบรรทัดต่างกันมาก
+    ให้เลือกชุดที่มีคะแนนรวมดีกว่า
+  */
+
+  if (
+    Math.abs(
+      a.length -
+      b.length
+    ) > 2
+  ) {
+
+    return (
+      scoreOCRLines(
+        b
+      ) >
+      scoreOCRLines(
+        a
+      )
+        ? b
+        : a
+    );
+
+  }
+
+  /*
+    ถ้าจำนวนบรรทัดใกล้กัน
+    เลือกทีละบรรทัด
+  */
+
+  const max =
+    Math.max(
+      a.length,
+      b.length
+    );
+
+  const result = [];
+
+  for (
+    let i = 0;
+    i < max;
+    i++
+  ) {
+
+    const lineA =
+      a[i] || null;
+
+    const lineB =
+      b[i] || null;
+
+    if (
+      !lineA &&
+      lineB
+    ) {
+
+      result.push(
+        lineB
+      );
+
+      continue;
+
+    }
+
+    if (
+      lineA &&
+      !lineB
+    ) {
+
+      result.push(
+        lineA
+      );
+
+      continue;
+
+    }
+
+    const chosen =
+      chooseBetterOCRLineObject(
+        lineA,
+        lineB
+      );
+
+    if (chosen) {
+
+      result.push(
+        chosen
+      );
+
+    }
+
+  }
+
+  return result;
+
+}
+
+
+/* =========================================================
+   CHOOSE BETTER OCR LINE OBJECT
+   ========================================================= */
+
+function chooseBetterOCRLineObject(
+  first,
+  second
+) {
+
+  if (!first) {
+    return second;
+  }
+
+  if (!second) {
+    return first;
+  }
+
+  const scoreA =
+    scoreOCRLineObject(
+      first
+    );
+
+  const scoreB =
+    scoreOCRLineObject(
+      second
+    );
+
+  /*
+    ถ้าคะแนนต่างกันชัดเจน
+    เลือกตัวที่ดีกว่า
+  */
+
+  if (
+    Math.abs(
+      scoreA -
+      scoreB
+    ) >= 8
+  ) {
+
+    return (
+      scoreB >
+      scoreA
+        ? second
+        : first
+    );
+
+  }
+
+  /*
+    ถ้าคะแนนใกล้กัน
+    ให้ความสำคัญกับ confidence
+  */
+
+  const confidenceA =
+    Number(
+      first.confidence
+    ) || 0;
+
+  const confidenceB =
+    Number(
+      second.confidence
+    ) || 0;
+
+  if (
+    confidenceB >
+    confidenceA + 3
+  ) {
+
+    return second;
+
+  }
+
+  return first;
+
+}
+
+
+/* =========================================================
+   SCORE OCR LINES
+   ========================================================= */
+
+function scoreOCRLines(
+  lines
+) {
+
+  if (
+    !Array.isArray(
+      lines
+    ) ||
+    !lines.length
+  ) {
+
+    return 0;
+
+  }
+
+  const total =
+    lines.reduce(
+      (
+        sum,
+        line
+      ) =>
+        sum +
+        scoreOCRLineObject(
+          line
+        ),
+      0
+    );
+
+  return (
+    total /
+    lines.length
+  );
+
+}
+
+
+/* =========================================================
    OCR QUALITY
    ========================================================= */
 
-function isGoodOCR(
-  text
+function isGoodOCRLines(
+  lines
 ) {
+
+  if (
+    !Array.isArray(
+      lines
+    ) ||
+    !lines.length
+  ) {
+
+    return false;
+
+  }
+
+  const usable =
+    lines.filter(
+      isUsableOCRLine
+    );
+
+  if (!usable.length) {
+    return false;
+  }
+
+  const text =
+    ocrLinesToText(
+      usable
+    );
 
   if (!text) {
     return false;
@@ -1522,104 +1909,42 @@ function isGoodOCR(
 
   }
 
-  return (
-    scoreOCR(
-      text
-    ) >= 45
-  );
+  const averageConfidence =
+    usable.reduce(
+      (
+        totalConfidence,
+        line
+      ) =>
+        totalConfidence +
+        (
+          Number(
+            line.confidence
+          ) || 0
+        ),
+      0
+    ) /
+    usable.length;
 
-}
+  /*
+    ถ้า confidence โดยรวมต่ำ
+    ให้ OCR รอบสองช่วย
+  */
 
+  if (
+    averageConfidence < 48
+  ) {
 
-function scoreOCR(
-  text
-) {
+    return false;
 
-  if (!text) {
-    return 0;
   }
 
-  const thai =
-    countThai(
-      text
-    );
-
-  const english =
-    countEnglish(
-      text
-    );
-
-  const letters =
-    thai +
-    english;
-
-  const length =
-    text.replace(
-      /\s/g,
-      ""
-    ).length;
-
-  if (!length) {
-    return 0;
-  }
-
-  const valid =
-    (
-      text.match(
-        /[A-Za-zก-๙0-9\s.,!?'"“”‘’\-:;()]/g
-      ) || []
-    ).length;
-
-  const garbage =
-    (
-      text.match(
-        /[^A-Za-zก-๙0-9\s.,!?'"“”‘’\-:;()]/g
-      ) || []
-    ).length;
-
-  let score =
-    Math.min(
-      50,
-      letters * 2
-    );
-
-  score +=
-    Math.min(
-      25,
-      text
-        .split("\n")
-        .filter(Boolean)
-        .length * 5
-    );
-
-  score +=
-    (
-      valid /
-      Math.max(
-        1,
-        text.length
-      )
-    ) * 20;
-
-  score -=
-    Math.min(
-      25,
-      garbage * 2
-    );
-
-  return Math.max(
-    0,
-    Math.min(
-      100,
-      score
-    )
-  );
+  return true;
 
 }
 
 
 /* =========================================================
-   NORMALIZE OCR
+   NORMALIZE OCR TEXT
    ========================================================= */
 
 function normalizeOCRText(
@@ -1665,7 +1990,7 @@ function cleanOCRLine(
 ) {
 
   let value =
-    String(line)
+    String(line || "")
       .replace(
         /\uFFFD/g,
         ""
@@ -1722,14 +2047,14 @@ function cleanOCRLine(
 
 
 /* =========================================================
-   CLEAN OCR CANDIDATE LINE
+   CLEAN OCR CANDIDATE
    ========================================================= */
 
 function cleanOCRCandidateLine(
   line
 ) {
 
-  let value =
+  const value =
     cleanOCRLine(
       line
     );
@@ -1738,9 +2063,19 @@ function cleanOCRCandidateLine(
     return "";
   }
 
+  const fakeLine = {
+
+    text:
+      value,
+
+    confidence:
+      100
+
+  };
+
   if (
-    isGarbageLine(
-      value
+    !isUsableOCRLine(
+      fakeLine
     )
   ) {
 
@@ -1748,19 +2083,7 @@ function cleanOCRCandidateLine(
 
   }
 
-  value =
-    value.replace(
-      /\s+[|•·¦]+\s+/g,
-      " "
-    );
-
-  value =
-    value.replace(
-      /\s{2,}/g,
-      " "
-    );
-
-  return value.trim();
+  return value;
 
 }
 
@@ -1782,99 +2105,17 @@ function cleanFinalOCRText(
     return "";
   }
 
-  const lines =
-    value
-      .split("\n")
-      .map(
-        line =>
-          cleanOCRCandidateLine(
-            line
-          )
-      )
-      .filter(Boolean);
-
-  const corrected =
-    lines.map(
+  return value
+    .split("\n")
+    .map(
       line =>
-        correctCommonThaiOCR(
+        cleanOCRCandidateLine(
           line
         )
-    );
-
-  return corrected.join(
-    "\n"
-  ).trim();
-
-}
-
-
-/* =========================================================
-   COMMON THAI OCR CORRECTION
-   ========================================================= */
-
-function correctCommonThaiOCR(
-  line
-) {
-
-  let value =
-    String(line);
-
-  value =
-    value.replace(
-      /เท่านัน/g,
-      "เท่านั้น"
-    );
-
-  value =
-    value.replace(
-      /เป็นตน/g,
-      "เป็นต้น"
-    );
-
-  value =
-    value.replace(
-      /นัน้/g,
-      "นั้น"
-    );
-
-  /*
-    OCR กรณี
-    กิจะช่วย...
-    ที่จริงมักเป็น
-    ที่จะช่วย...
-  */
-
-  value =
-    value.replace(
-      /^กิจะ(?=\s|ช่วย|ทำ|เป็น|ไป|ได้)/,
-      "ที่จะ"
-    );
-
-  value =
-    value.replace(
-      /กิจะช่วย/g,
-      "ที่จะช่วย"
-    );
-
-  value =
-    value.replace(
-      /กิจะทำ/g,
-      "ที่จะทำ"
-    );
-
-  value =
-    value.replace(
-      /กิจะเป็น/g,
-      "ที่จะเป็น"
-    );
-
-  value =
-    value.replace(
-      /([ก-๙])\s+([่้๊๋ั็์])/g,
-      "$1$2"
-    );
-
-  return value.trim();
+    )
+    .filter(Boolean)
+    .join("\n")
+    .trim();
 
 }
 
@@ -1907,11 +2148,9 @@ function isGarbageLine(
     );
 
   const symbols =
-    (
-      line.match(
-        /[^A-Za-zก-๙0-9\s]/g
-      ) || []
-    ).length;
+    countOCRSymbols(
+      line
+    );
 
   const letters =
     thai +
@@ -1948,35 +2187,10 @@ function isGarbageLine(
 
   }
 
-  const words =
-    line
-      .split(/\s+/)
-      .filter(Boolean);
-
-  if (
-    alphanumeric <= 5 &&
-    words.length >= 3 &&
-    symbols >= 2
-  ) {
-
-    return true;
-
-  }
-
   if (
     /(.)\1{7,}/u.test(
       line
     )
-  ) {
-
-    return true;
-
-  }
-
-  if (
-    line.length <= 12 &&
-    symbols >= 3 &&
-    alphanumeric <= 5
   ) {
 
     return true;
@@ -2106,6 +2320,12 @@ function isSourceLine(
       return false;
 
     }
+
+    /*
+      ป้องกันบรรทัดแบบ
+      "It's only หอน"
+      ไม่ให้ถูกมองว่าเป็นอังกฤษล้วน
+    */
 
     if (
       thai > 0 &&
@@ -2242,12 +2462,6 @@ async function translateSingleText(
 
   }
 
-  /*
-    ใช้ URLSearchParams เพื่อให้
-    Google Apps Script รับ POST ได้ง่าย
-    และลดปัญหา CORS preflight
-  */
-
   const payload =
     JSON.stringify({
 
@@ -2286,6 +2500,7 @@ async function translateSingleText(
 
           redirect:
             "follow"
+
         }
       );
 
@@ -2346,12 +2561,6 @@ function extractTranslation(
   raw
 ) {
 
-  /*
-    ======================================================
-    กรณีมี JSON object อยู่แล้ว
-    ======================================================
-  */
-
   if (
     data &&
     typeof data ===
@@ -2371,13 +2580,6 @@ function extractTranslation(
 
   }
 
-
-  /*
-    ======================================================
-    อ่าน raw response
-    ======================================================
-  */
-
   if (
     typeof raw !==
       "string"
@@ -2396,11 +2598,8 @@ function extractTranslation(
 
   }
 
-
   /*
-    บางครั้ง Apps Script
-    อาจส่ง JSON มาเป็น string
-    ======================================================
+    ลอง JSON หลายชั้น
   */
 
   for (
@@ -2427,11 +2626,6 @@ function extractTranslation(
 
       }
 
-      /*
-        ถ้า parsed เป็น string
-        ลอง parse ต่ออีกครั้ง
-      */
-
       if (
         typeof parsed ===
         "string"
@@ -2454,11 +2648,8 @@ function extractTranslation(
 
   }
 
-
   /*
-    ======================================================
-    ลบ JSONP / callback ถ้ามี
-    ======================================================
+    JSONP
   */
 
   value =
@@ -2472,7 +2663,6 @@ function extractTranslation(
       /\s*\)\s*;?\s*$/,
       ""
     ).trim();
-
 
   try {
 
@@ -2494,16 +2684,12 @@ function extractTranslation(
 
   } catch {
 
-    // ไม่เป็น JSON ให้ตรวจเป็นข้อความต่อ
+    // ไม่เป็น JSON
 
   }
 
-
   /*
-    ======================================================
-    ถ้าเป็น HTML error page
-    ไม่เอา HTML ไปแสดงเป็นคำแปล
-    ======================================================
+    ป้องกัน HTML error
   */
 
   const lower =
@@ -2524,13 +2710,6 @@ function extractTranslation(
     return "";
 
   }
-
-
-  /*
-    ======================================================
-    กรณี API ส่งข้อความแปลตรง ๆ
-    ======================================================
-  */
 
   return value.trim();
 
@@ -2554,24 +2733,14 @@ function findTranslationValue(
 
   }
 
-
-  /*
-    ถ้าเป็น string
-    ถือว่าเป็นคำแปล
-  */
-
   if (
     typeof data ===
       "string"
   ) {
 
-    const value =
-      data.trim();
-
-    return value;
+    return data.trim();
 
   }
-
 
   if (
     typeof data !==
@@ -2581,11 +2750,6 @@ function findTranslationValue(
     return "";
 
   }
-
-
-  /*
-    รองรับชื่อ field หลายแบบ
-  */
 
   const keys = [
 
@@ -2600,7 +2764,6 @@ function findTranslationValue(
     "message"
 
   ];
-
 
   for (
     const key
@@ -2627,7 +2790,6 @@ function findTranslationValue(
 
       }
 
-
       if (
         typeof value ===
           "object"
@@ -2650,13 +2812,6 @@ function findTranslationValue(
 
   }
 
-
-  /*
-    รองรับ
-    { data: {...} }
-    { data: "..." }
-  */
-
   if (
     data.data !==
       undefined &&
@@ -2676,32 +2831,6 @@ function findTranslationValue(
     }
 
   }
-
-
-  /*
-    รองรับ
-    { result: { translation: "..." } }
-  */
-
-  if (
-    data.result &&
-    typeof data.result ===
-      "object"
-  ) {
-
-    const nested =
-      findTranslationValue(
-        data.result
-      );
-
-    if (nested) {
-
-      return nested;
-
-    }
-
-  }
-
 
   return "";
 
