@@ -3,7 +3,7 @@
    Thai ↔ English
    OCR + Translation
 
-   VERSION 24
+   VERSION 25
 
    จุดแก้หลัก:
    - ใช้ภาพต้นฉบับเป็นหลัก
@@ -12,8 +12,10 @@
    - PSM 11 สำหรับข้อความหลายตำแหน่ง
    - PSM 6 เป็น fallback
    - กรอง noise ระดับ word
-   - กรองบรรทัดที่เป็นตัวอักษรมั่ว
-   - พยายามรักษาคำอังกฤษสั้น ๆ ที่เป็นคำจริง
+   - กรองบรรทัด OCR ที่ผิดธรรมชาติ
+   - กรองคำอังกฤษยาวติดกันแบบ noise
+   - กรองตัวอักษรอังกฤษสลับพิมพ์ใหญ่/เล็กผิดธรรมชาติ
+   - กรองบรรทัดไทยที่มีตัวเลข/สัญลักษณ์ผิดปกติ
    - รองรับ Camera + Gallery
    - ไม่ hardcode รูปตัวอย่าง
 ========================================================= */
@@ -1115,10 +1117,6 @@ function getWordQuality(
 
 /* =========================================================
    ENGLISH WORD QUALITY
-   ป้องกันคำมั่ว เช่น
-   wihoaudafuwfeiashiay
-   AruAULGEIIMUU
-   Ad=tHowdaddAmuvld
 ========================================================= */
 
 function englishWordLooksReal(
@@ -1177,10 +1175,7 @@ function englishWordLooksReal(
 
 
   /*
-    คำจริงสั้น ๆ เช่น
-    a / i / to / me / you /
-    were / just / but / sky
-    ต้องไม่ถูกตัดทิ้งง่ายเกินไป
+    คำอังกฤษสั้น ๆ จริง
   */
 
   if (
@@ -1196,8 +1191,7 @@ function englishWordLooksReal(
 
 
   /*
-    คำยาวมากแต่ไม่มีสระ
-    มักเป็น OCR noise
+    คำยาวแต่ไม่มีสระ
   */
 
   if (
@@ -1212,7 +1206,7 @@ function englishWordLooksReal(
 
 
   /*
-    ตัวอักษรซ้ำ/รูปแบบผิดธรรมชาติ
+    ตัวซ้ำติดกันผิดธรรมชาติ
   */
 
   if (
@@ -1228,7 +1222,7 @@ function englishWordLooksReal(
 
 
   /*
-    ตัวอักษรไม่หลากหลายผิดปกติ
+    ตัวอักษรซ้ำชนิดเดิมมากเกินไป
   */
 
   if (
@@ -1243,8 +1237,7 @@ function englishWordLooksReal(
 
 
   /*
-    คำยาวมาก
-    ต้องมี confidence สูงพอ
+    คำยาวมากต้องมั่นใจสูง
   */
 
   if (
@@ -1258,8 +1251,7 @@ function englishWordLooksReal(
 
 
   /*
-    คำยาวตั้งแต่ 9 ตัว
-    แต่สระน้อยมาก
+    คำยาวแต่มีสระน้อยผิดปกติ
   */
 
   if (
@@ -1273,11 +1265,6 @@ function englishWordLooksReal(
 
   }
 
-
-  /*
-    ถ้า confidence ต่ำมาก
-    ต้องเป็นคำที่มีรูปแบบค่อนข้างสมเหตุสมผล
-  */
 
   if (
     confidence < 35 &&
@@ -1339,10 +1326,6 @@ function thaiWordLooksReal(
   }
 
 
-  /*
-    ตัวเลข/อังกฤษปนมากกว่าภาษาไทย
-  */
-
   if (
     confidence < 55 &&
     (
@@ -1356,11 +1339,6 @@ function thaiWordLooksReal(
   }
 
 
-  /*
-    ภาษาไทยที่สั้นมาก
-    ต้องมี confidence พอสมควร
-  */
-
   if (
     thai <= 2 &&
     confidence < 35
@@ -1370,10 +1348,6 @@ function thaiWordLooksReal(
 
   }
 
-
-  /*
-    สัญลักษณ์เยอะเกินไป
-  */
 
   const symbols =
     (
@@ -1515,7 +1489,7 @@ function getLineWords(
 
 
 /* =========================================================
-   FILTER ENGLISH WORDS FROM LINE
+   FILTER ENGLISH WORDS
 ========================================================= */
 
 function filterEnglishLineWords(
@@ -1577,11 +1551,6 @@ function filterEnglishLineWords(
       );
 
 
-    /*
-      คำที่เป็นภาษาไทยจาก worker อังกฤษ
-      ไม่เอา
-    */
-
     if (
       thai > english
     ) {
@@ -1616,11 +1585,6 @@ function filterEnglishLineWords(
   }
 
 
-  /*
-    ถ้ากรองแล้วไม่มีคำเหลือ
-    ให้พิจารณาจาก confidence ของทั้งบรรทัด
-  */
-
   if (
     accepted.length === 0
   ) {
@@ -1630,11 +1594,6 @@ function filterEnglishLineWords(
         line.confidence || 0
       );
 
-
-    /*
-      บรรทัดที่มั่นใจสูงมาก
-      ให้ใช้ข้อความเดิมได้
-    */
 
     if (
       lineConfidence >= 82 &&
@@ -1663,7 +1622,7 @@ function filterEnglishLineWords(
 
 
 /* =========================================================
-   FILTER THAI WORDS FROM LINE
+   FILTER THAI WORDS
 ========================================================= */
 
 function filterThaiLineWords(
@@ -1838,6 +1797,10 @@ function isGoodThaiLine(
       0;
 
 
+    let thaiWords =
+      0;
+
+
     for (
       const word
       of words
@@ -1852,6 +1815,8 @@ function isGoodThaiLine(
       if (
         quality.thai > 0
       ) {
+
+        thaiWords++;
 
         totalConfidence +=
           quality.confidence;
@@ -1871,15 +1836,6 @@ function isGoodThaiLine(
       }
 
     }
-
-
-    const thaiWords =
-      words.filter(
-        word =>
-          countThai(
-            word.text
-          ) > 0
-      ).length;
 
 
     const averageConfidence =
@@ -2105,12 +2061,6 @@ function isGoodEnglishLine(
         1
       );
 
-
-    /*
-      ถ้ามีคำอังกฤษหลายคำ
-      แต่ไม่มีคำไหนดูเป็นคำจริง
-      ให้ตัดทั้งบรรทัด
-    */
 
     if (
       englishWords >= 2 &&
@@ -2472,7 +2422,308 @@ function deduplicateLines(
 
 
 /* =========================================================
-   FINAL LINE NOISE CHECK
+   FINAL ENGLISH NOISE DETECTOR
+========================================================= */
+
+function isEnglishNoiseLine(
+  text
+) {
+
+  const value =
+    cleanText(
+      text
+    );
+
+
+  if (!value)
+    return true;
+
+
+  const english =
+    countEnglish(
+      value
+    );
+
+
+  const thai =
+    countThai(
+      value
+    );
+
+
+  if (
+    english === 0
+  ) {
+
+    return false;
+
+  }
+
+
+  if (
+    thai > english
+  ) {
+
+    return false;
+
+  }
+
+
+  /*
+    แยกคำจริง
+  */
+
+  const words =
+    value
+      .split(/\s+/)
+      .filter(Boolean);
+
+
+  /*
+    กรณีเป็นคำเดียว
+    และยาวมาก
+    เช่น
+    wihoaudafuwfeiashiay
+  */
+
+  if (
+    words.length === 1 &&
+    english >= 15
+  ) {
+
+    const word =
+      words[0]
+        .replace(
+          /[^a-zA-Z]/g,
+          ""
+        );
+
+
+    const lower =
+      word.toLowerCase();
+
+
+    const vowels =
+      (
+        lower.match(
+          /[aeiouy]/g
+        ) || []
+      ).length;
+
+
+    const consonants =
+      (
+        lower.match(
+          /[bcdfghjklmnpqrstvwxz]/g
+        ) || []
+      ).length;
+
+
+    const unique =
+      new Set(
+        lower.split("")
+      ).size;
+
+
+    /*
+      คำยาว 15+ ตัว
+      ถ้าไม่มีช่องว่างและรูปแบบผิดธรรมชาติ
+      ตัดทิ้ง
+    */
+
+    if (
+      vowels <= 3 ||
+      consonants >= 10 ||
+      unique <= 6
+    ) {
+
+      return true;
+
+    }
+
+  }
+
+
+  /*
+    คำอังกฤษ 20+ ตัวติดกัน
+    ไม่ควรเป็นข้อความธรรมดา
+  */
+
+  if (
+    english >= 20 &&
+    words.length <= 2
+  ) {
+
+    const joined =
+      value.replace(
+        /\s/g,
+        ""
+      );
+
+
+    const vowels =
+      (
+        joined
+          .toLowerCase()
+          .match(
+            /[aeiouy]/g
+          ) || []
+      ).length;
+
+
+    if (
+      vowels <= 5
+    ) {
+
+      return true;
+
+    }
+
+  }
+
+
+  /*
+    ตรวจรูปแบบตัวพิมพ์ใหญ่เล็กที่สลับมั่ว
+  */
+
+  if (
+    english >= 10
+  ) {
+
+    const mixedPattern =
+      (
+        value.match(
+          /[a-z][A-Z][a-z][A-Z]/g
+        ) || []
+      ).length;
+
+
+    const upperPattern =
+      (
+        value.match(
+          /[A-Z][a-z][A-Z][a-z]/g
+        ) || []
+      ).length;
+
+
+    if (
+      mixedPattern >= 2 ||
+      upperPattern >= 2
+    ) {
+
+      return true;
+
+    }
+
+  }
+
+
+  return false;
+
+}
+
+
+/* =========================================================
+   FINAL THAI NOISE DETECTOR
+========================================================= */
+
+function isThaiNoiseLine(
+  text
+) {
+
+  const value =
+    cleanText(
+      text
+    );
+
+
+  if (!value)
+    return true;
+
+
+  const thai =
+    countThai(
+      value
+    );
+
+
+  const english =
+    countEnglish(
+      value
+    );
+
+
+  const digits =
+    countDigits(
+      value
+    );
+
+
+  if (
+    thai === 0
+  ) {
+
+    return false;
+
+  }
+
+
+  /*
+    ตัวเลขเยอะผิดธรรมชาติ
+  */
+
+  if (
+    digits >= 3 &&
+    digits >= thai
+  ) {
+
+    return true;
+
+  }
+
+
+  /*
+    อังกฤษปนเยอะ
+  */
+
+  if (
+    english > thai * 0.8
+  ) {
+
+    return true;
+
+  }
+
+
+  /*
+    สัญลักษณ์มากผิดปกติ
+  */
+
+  const symbols =
+    (
+      value.match(
+        /[^ก-๙a-zA-Z0-9๐-๙\s]/g
+      ) || []
+    ).length;
+
+
+  if (
+    symbols >= 5 &&
+    symbols >= thai * 0.7
+  ) {
+
+    return true;
+
+  }
+
+
+  return false;
+
+}
+
+
+/* =========================================================
+   FINAL OCR NOISE
 ========================================================= */
 
 function isFinalOCRNoise(
@@ -2512,10 +2763,6 @@ function isFinalOCRNoise(
     english;
 
 
-  /*
-    ไม่มีตัวอักษรที่มีประโยชน์
-  */
-
   if (
     letters === 0
   ) {
@@ -2526,33 +2773,18 @@ function isFinalOCRNoise(
 
 
   /*
-    ตัวอังกฤษติดกันยาวมาก
-    เช่น wihoaudafuwfeiashiay
+    ภาษาอังกฤษ
   */
 
   if (
-    english >= 16 &&
-    thai === 0 &&
-    !/\s/.test(text)
+    english > 0 &&
+    thai === 0
   ) {
 
-    const vowels =
-      (
-        text
-          .toLowerCase()
-          .match(
-            /[aeiouy]/g
-          ) || []
-      ).length;
-
-
-    /*
-      ถ้ายาวมากและไม่มีสระเลย
-      หรือมีสระน้อยผิดธรรมชาติ
-    */
-
     if (
-      vowels <= 2
+      isEnglishNoiseLine(
+        text
+      )
     ) {
 
       return true;
@@ -2563,17 +2795,22 @@ function isFinalOCRNoise(
 
 
   /*
-    ภาษาอังกฤษยาวติดกันแบบไม่มีช่องว่าง
-    ให้เข้มงวดเป็นพิเศษ
+    ภาษาไทย
   */
 
   if (
-    english >= 20 &&
-    thai === 0 &&
-    !/\s/.test(text)
+    thai > 0
   ) {
 
-    return true;
+    if (
+      isThaiNoiseLine(
+        text
+      )
+    ) {
+
+      return true;
+
+    }
 
   }
 
@@ -2588,58 +2825,6 @@ function isFinalOCRNoise(
   ) {
 
     return true;
-
-  }
-
-
-  /*
-    บรรทัดที่มีสัญลักษณ์เยอะมาก
-  */
-
-  const symbols =
-    (
-      text.match(
-        /[^ก-๙a-zA-Z0-9๐-๙\s]/g
-      ) || []
-    ).length;
-
-
-  if (
-    symbols >= 5 &&
-    symbols >
-      letters * 0.7
-  ) {
-
-    return true;
-
-  }
-
-
-  /*
-    ตัวอังกฤษที่เป็น pattern แปลก
-    เช่น ตัวพิมพ์ใหญ่/เล็กสลับกันมั่ว
-  */
-
-  if (
-    english >= 10 &&
-    thai === 0
-  ) {
-
-    const mixedCase =
-      (
-        text.match(
-          /[A-Z][a-z][A-Z][a-z]/g
-        ) || []
-      ).length;
-
-
-    if (
-      mixedCase >= 2
-    ) {
-
-      return true;
-
-    }
 
   }
 
@@ -2779,10 +2964,6 @@ function cleanFinalOCR(
     }
 
 
-    /*
-      ห้ามซ้ำข้อความเดิม
-    */
-
     const normalized =
       normalizeLine(
         line
@@ -2881,9 +3062,7 @@ async function runOCR(
 
 
     /*
-      =====================================================
       PASS 1
-      =====================================================
     */
 
     showLoading(
@@ -2927,9 +3106,7 @@ async function runOCR(
 
 
     /*
-      =====================================================
       PASS 2
-      =====================================================
     */
 
     if (
@@ -2984,10 +3161,6 @@ async function runOCR(
     }
 
 
-    /*
-      ลบข้อความซ้ำ
-    */
-
     thaiLines =
       deduplicateLines(
         thaiLines
@@ -3000,20 +3173,12 @@ async function runOCR(
       );
 
 
-    /*
-      รวมตามตำแหน่ง
-    */
-
     let finalText =
       mergeLines(
         thaiLines,
         englishLines
       );
 
-
-    /*
-      กรอง noise รอบสุดท้าย
-    */
 
     finalText =
       cleanFinalOCR(
