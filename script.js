@@ -3,7 +3,7 @@
    Thai ↔ English
    OCR + Translation
 
-   VERSION 27
+   VERSION 28
 
    จุดแก้หลัก:
    - ใช้ภาพต้นฉบับเป็นหลัก
@@ -21,6 +21,12 @@
    - กรอง unknown และ English noise
    - รองรับ Camera + Gallery
    - ไม่ hardcode รูปตัวอย่าง
+
+   VERSION 28 เพิ่ม:
+   - ตรวจตำแหน่งบรรทัดไทยกับอังกฤษ
+   - ถ้า OCR ภาษาไทยอ่านภาษาอังกฤษซ้ำในตำแหน่งเดียวกัน
+     จะตัดเฉพาะบรรทัดไทยขยะนั้นออก
+   - ไม่ลบบรรทัดไทยจริงที่อยู่คนละตำแหน่ง
 ========================================================= */
 
 const API_URL =
@@ -1652,11 +1658,6 @@ function rebuildThaiFromSymbols(
       );
 
 
-    /*
-      เอาเฉพาะ symbol ไทย
-      เพราะ worker นี้เป็นภาษาไทย
-    */
-
     if (
       thai === 0 &&
       english === 0
@@ -1723,11 +1724,6 @@ function rebuildThaiFromSymbols(
   );
 
 
-  /*
-    รวม symbol ไทยเข้าด้วยกัน
-    โดยไม่ใช้ช่องว่างจาก OCR
-  */
-
   let result = "";
 
 
@@ -1739,11 +1735,6 @@ function rebuildThaiFromSymbols(
     let value =
       char.text;
 
-
-    /*
-      ถ้าเป็นวรรณยุกต์/สระ
-      ให้ติดกับตัวก่อนหน้าเสมอ
-    */
 
     value =
       value.replace(
@@ -1949,13 +1940,6 @@ function filterThaiLineWords(
   data
 ) {
 
-  /*
-    สำคัญที่สุดของ Version 27
-
-    ก่อนใช้ words ให้ลองสร้างข้อความ
-    จาก symbols ก่อน
-  */
-
   const symbolText =
     rebuildThaiFromSymbols(
       line,
@@ -1972,11 +1956,6 @@ function filterThaiLineWords(
 
   }
 
-
-  /*
-    fallback
-    ถ้า symbols ใช้ไม่ได้
-  */
 
   const words =
     getLineWords(
@@ -2098,13 +2077,6 @@ function isGoodThaiLine(
 
   }
 
-
-  /*
-    ถ้ามีไทยเยอะพอ
-    ให้ยอมรับแม้ line confidence ต่ำ
-    เพราะภาษาไทยของ Tesseract
-    มักให้ confidence ต่ำเมื่อแยก symbol
-  */
 
   if (
     thai >= 5 &&
@@ -2371,6 +2343,16 @@ function extractLines(
         Number(
           (bbox.y1 || 0) -
           (bbox.y0 || 0)
+        ),
+
+      x1:
+        Number(
+          bbox.x1 || 0
+        ),
+
+      y1:
+        Number(
+          bbox.y1 || 0
         )
 
     });
@@ -2557,6 +2539,512 @@ function deduplicateLines(
 
 
 /* =========================================================
+   NEW - GEOMETRY HELPERS
+========================================================= */
+
+function getLineRight(
+  line
+) {
+
+  const x =
+    Number(
+      line.x || 0
+    );
+
+
+  const width =
+    Number(
+      line.width || 0
+    );
+
+
+  if (
+    Number.isFinite(
+      line.x1
+    ) &&
+    Number(line.x1) > x
+  ) {
+
+    return Number(
+      line.x1
+    );
+
+  }
+
+
+  return x + width;
+
+}
+
+
+function getLineBottom(
+  line
+) {
+
+  const y =
+    Number(
+      line.y || 0
+    );
+
+
+  const height =
+    Number(
+      line.height || 0
+    );
+
+
+  if (
+    Number.isFinite(
+      line.y1
+    ) &&
+    Number(line.y1) > y
+  ) {
+
+    return Number(
+      line.y1
+    );
+
+  }
+
+
+  return y + height;
+
+}
+
+
+/* =========================================================
+   NEW - CHECK OVERLAPPING LINES
+========================================================= */
+
+/*
+  ตรวจว่าบรรทัด 2 บรรทัดอยู่บริเวณเดียวกันหรือไม่
+
+  ใช้ bbox เป็นหลัก ไม่ใช้ข้อความ
+  เพราะปัญหาที่เกิดขึ้นคือ
+
+  อังกฤษจริง:
+  You weren't just a star to me,
+
+  ไทย OCR ผิด:
+  ทอนจดลทแรลรลทเอ
+
+  ทั้งสองบรรทัดอยู่ตำแหน่งเดียวกันบนรูป
+*/
+
+function linesOccupySameArea(
+  lineA,
+  lineB
+) {
+
+  if (
+    !lineA ||
+    !lineB
+  ) {
+
+    return false;
+
+  }
+
+
+  const ax0 =
+    Number(
+      lineA.x || 0
+    );
+
+
+  const ay0 =
+    Number(
+      lineA.y || 0
+    );
+
+
+  const ax1 =
+    getLineRight(
+      lineA
+    );
+
+
+  const ay1 =
+    getLineBottom(
+      lineA
+    );
+
+
+  const bx0 =
+    Number(
+      lineB.x || 0
+    );
+
+
+  const by0 =
+    Number(
+      lineB.y || 0
+    );
+
+
+  const bx1 =
+    getLineRight(
+      lineB
+    );
+
+
+  const by1 =
+    getLineBottom(
+      lineB
+    );
+
+
+  const aWidth =
+    Math.max(
+      1,
+      ax1 - ax0
+    );
+
+
+  const aHeight =
+    Math.max(
+      1,
+      ay1 - ay0
+    );
+
+
+  const bWidth =
+    Math.max(
+      1,
+      bx1 - bx0
+    );
+
+
+  const bHeight =
+    Math.max(
+      1,
+      by1 - by0
+    );
+
+
+  const horizontalOverlap =
+    Math.max(
+      0,
+      Math.min(
+        ax1,
+        bx1
+      ) -
+      Math.max(
+        ax0,
+        bx0
+      )
+    );
+
+
+  const verticalOverlap =
+    Math.max(
+      0,
+      Math.min(
+        ay1,
+        by1
+      ) -
+      Math.max(
+        ay0,
+        by0
+      )
+    );
+
+
+  const horizontalRatio =
+    horizontalOverlap /
+    Math.min(
+      aWidth,
+      bWidth
+    );
+
+
+  const verticalRatio =
+    verticalOverlap /
+    Math.min(
+      aHeight,
+      bHeight
+    );
+
+
+  /*
+    ถ้าทับกันในแนวตั้งอย่างน้อยครึ่งหนึ่ง
+    และมีพื้นที่ซ้อนกันในแนวนอน
+    ให้ถือว่าอยู่บรรทัดเดียวกัน
+  */
+
+  if (
+    verticalRatio >= 0.50 &&
+    horizontalRatio >= 0.15
+  ) {
+
+    return true;
+
+  }
+
+
+  /*
+    กรณี bbox จาก Tesseract เล็ก/เพี้ยน
+    ให้ดูจุดกึ่งกลางของบรรทัดด้วย
+  */
+
+  const centerAY =
+    (ay0 + ay1) / 2;
+
+
+  const centerBY =
+    (by0 + by1) / 2;
+
+
+  const centerAX =
+    (ax0 + ax1) / 2;
+
+
+  const centerBX =
+    (bx0 + bx1) / 2;
+
+
+  const centerYDistance =
+    Math.abs(
+      centerAY -
+      centerBY
+    );
+
+
+  const centerXDistance =
+    Math.abs(
+      centerAX -
+      centerBX
+    );
+
+
+  const allowedY =
+    Math.max(
+      8,
+      Math.min(
+        aHeight,
+        bHeight
+      ) * 0.55
+    );
+
+
+  const allowedX =
+    Math.max(
+      20,
+      Math.min(
+        aWidth,
+        bWidth
+      ) * 0.85
+    );
+
+
+  if (
+    centerYDistance <= allowedY &&
+    centerXDistance <= allowedX
+  ) {
+
+    return true;
+
+  }
+
+
+  return false;
+
+}
+
+
+/* =========================================================
+   NEW - DETECT THAI OCR DUPLICATE OF ENGLISH
+========================================================= */
+
+/*
+  ภาษาไทยจริงในรูปตัวอย่างอยู่คนละบรรทัดกับอังกฤษ
+
+  อังกฤษ:
+  You weren't just a star to me,
+
+  ไทยจริง:
+  เธอไม่ได้เป็นแค่เพียงดวงดาวสำหรับฉัน
+
+  แต่ภาษาไทย worker อ่านอังกฤษซ้ำออกมาเป็น:
+  ทอนจดลทแรลรลทเอ
+
+  ดังนั้นถ้า Thai line กับ English line
+  อยู่พื้นที่เดียวกัน จะตัด Thai line ทิ้ง
+*/
+
+function isThaiOCRDuplicateOfEnglish(
+  thaiLine,
+  englishLines
+) {
+
+  if (
+    !thaiLine ||
+    thaiLine.language !== "th"
+  ) {
+
+    return false;
+
+  }
+
+
+  if (
+    !Array.isArray(
+      englishLines
+    ) ||
+    englishLines.length === 0
+  ) {
+
+    return false;
+
+  }
+
+
+  const thaiText =
+    cleanText(
+      thaiLine.text
+    );
+
+
+  if (!thaiText)
+    return false;
+
+
+  const thaiCount =
+    countThai(
+      thaiText
+    );
+
+
+  const englishCount =
+    countEnglish(
+      thaiText
+    );
+
+
+  /*
+    ต้องเป็นข้อความที่เป็นไทยจริง
+    ไม่ใช่ line ที่มีอังกฤษปนอยู่เยอะ
+  */
+
+  if (
+    thaiCount < 3
+  ) {
+
+    return false;
+
+  }
+
+
+  if (
+    englishCount >
+    thaiCount * 0.35
+  ) {
+
+    return false;
+
+  }
+
+
+  for (
+    const englishLine
+    of englishLines
+  ) {
+
+    if (
+      linesOccupySameArea(
+        thaiLine,
+        englishLine
+      )
+    ) {
+
+      return true;
+
+    }
+
+  }
+
+
+  return false;
+
+}
+
+
+/* =========================================================
+   NEW - REMOVE OVERLAPPING THAI OCR
+========================================================= */
+
+function removeOverlappingThaiOCR(
+  thaiLines,
+  englishLines
+) {
+
+  if (
+    !Array.isArray(
+      thaiLines
+    )
+  ) {
+
+    return [];
+
+  }
+
+
+  if (
+    !Array.isArray(
+      englishLines
+    ) ||
+    englishLines.length === 0
+  ) {
+
+    return thaiLines;
+
+  }
+
+
+  const filtered = [];
+
+
+  for (
+    const thaiLine
+    of thaiLines
+  ) {
+
+    if (
+      isThaiOCRDuplicateOfEnglish(
+        thaiLine,
+        englishLines
+      )
+    ) {
+
+      /*
+        ไม่เอา line นี้
+        เพราะเป็นภาษาอังกฤษที่ Thai OCR อ่านซ้ำ
+      */
+
+      console.log(
+        "ตัด Thai OCR duplicate:",
+        thaiLine.text
+      );
+
+
+      continue;
+
+    }
+
+
+    filtered.push(
+      thaiLine
+    );
+
+  }
+
+
+  return filtered;
+
+}
+
+
+/* =========================================================
    FINAL ENGLISH NOISE DETECTOR
 ========================================================= */
 
@@ -2609,10 +3097,6 @@ function isEnglishNoiseLine(
       .split(/\s+/)
       .filter(Boolean);
 
-
-  /*
-    unknown / unknown-like
-  */
 
   if (
     words.length === 1
@@ -2965,21 +3449,12 @@ function normalizeThaiText(
       );
 
 
-  /*
-    ภาษาไทยไม่ควรมีช่องว่าง
-    ระหว่างตัวอักษรที่ OCR แยกออกมา
-  */
-
   value =
     value.replace(
       /([ก-๙])\s+(?=[ก-๙])/g,
       "$1"
     );
 
-
-  /*
-    ช่องว่างก่อนสระ/วรรณยุกต์
-  */
 
   value =
     value.replace(
@@ -2988,20 +3463,12 @@ function normalizeThaiText(
     );
 
 
-  /*
-    ช่องว่างหลังสระนำ
-  */
-
   value =
     value.replace(
       /([เแโใไ])\s+(?=[ก-๙])/g,
       "$1"
     );
 
-
-  /*
-    รวมไทยซ้ำอีกครั้ง
-  */
 
   value =
     value.replace(
@@ -3028,6 +3495,19 @@ function mergeLines(
   thaiLines,
   englishLines
 ) {
+
+  /*
+    VERSION 28
+    ตัดเฉพาะภาษาไทยที่ OCR อ่านภาษาอังกฤษซ้ำ
+    โดยดูจากตำแหน่ง bbox
+  */
+
+  thaiLines =
+    removeOverlappingThaiOCR(
+      thaiLines,
+      englishLines
+    );
+
 
   const all = [
 
