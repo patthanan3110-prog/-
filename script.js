@@ -11,6 +11,7 @@
    - ปรับการเลือกผล OCR
    - ตัดเครดิต OCR ขนาดเล็ก เช่น unknown -
    - ป้องกันข้อความซ้ำในผลแปล
+   - แก้คำ OCR ภาษาไทยที่พบบ่อย
 ========================================= */
 
 
@@ -1352,13 +1353,9 @@ function scoreOCRResult(
   let score = 0;
 
 
-  /* จำนวนบรรทัดสำคัญที่สุด */
-
   score +=
     lineCount * 18;
 
-
-  /* จำนวนตัวอักษร */
 
   score +=
     Math.min(
@@ -1366,8 +1363,6 @@ function scoreOCRResult(
       100
     ) * 0.8;
 
-
-  /* confidence เป็นคะแนนเสริม */
 
   score +=
     confidence * 0.15;
@@ -1399,10 +1394,6 @@ function scoreOCRResult(
 
   }
 
-
-  /* =====================================
-     GARBAGE LINES
-  ===================================== */
 
   let garbageLines =
     0;
@@ -1524,16 +1515,6 @@ function removeOCRCreditLines(
           );
 
 
-      /*
-         เครดิตเล็ก ๆ ที่ OCR มักอ่านติดมา
-
-         ตัวอย่าง:
-         unknown -
-         - unknown
-         — unknown —
-         unknown
-      */
-
       if (
         /^unknown\s*[-–—]?\s*$/i.test(
           normalized
@@ -1555,11 +1536,6 @@ function removeOCRCreditLines(
 
       }
 
-
-      /*
-         รูปแบบเครดิตทั่วไป
-         ไม่ลบคำ unknown ที่อยู่กลางประโยค
-      */
 
       if (
         /^unknown\s*[-–—]\s*$/i.test(
@@ -1634,7 +1610,7 @@ function cleanOCRText(text) {
 
   /* =====================================
      COMMON THAI OCR CORRECTIONS
-  ===================================== */
+========================================= */
 
   const corrections = [
 
@@ -1734,6 +1710,24 @@ function cleanOCRText(text) {
         /โปรดรบประทาน/g,
       replacement:
         "โปรดรับประทาน"
+    },
+
+    /* แก้คำว่า ทัง → ทั้ง */
+
+    {
+      pattern:
+        /ทัง/g,
+      replacement:
+        "ทั้ง"
+    },
+
+    /* แก้ สําหรับ → สำหรับ */
+
+    {
+      pattern:
+        /สําหรับ/g,
+      replacement:
+        "สำหรับ"
     }
 
   ];
@@ -2019,6 +2013,22 @@ function cleanOCRText(text) {
           line.replace(
             /โปรดรบประทาน/g,
             "โปรดรับประทาน"
+          );
+
+
+        /* แก้คำที่ OCR อ่านผิด */
+
+        line =
+          line.replace(
+            /ทัง/g,
+            "ทั้ง"
+          );
+
+
+        line =
+          line.replace(
+            /สําหรับ/g,
+            "สำหรับ"
           );
 
 
@@ -2708,12 +2718,6 @@ function removeDuplicateTranslationBlocks(
       );
 
 
-  /*
-     ลบบรรทัดที่ซ้ำกันแบบตรง ๆ
-     เฉพาะกรณีที่เป็นประโยคยาว
-     เพื่อไม่ไปยุ่งกับข้อความสั้นทั่วไป
-  */
-
   const seen =
     new Set();
 
@@ -2767,26 +2771,6 @@ function removeDuplicateTranslationBlocks(
   lines =
     filtered;
 
-
-  /*
-     ตรวจจับ block ที่ซ้ำกัน
-     เช่น
-
-     A
-     B
-     C
-     A
-     B
-
-     จะเหลือ
-
-     A
-     B
-     C
-
-     ใช้เฉพาะ block 2-3 บรรทัด
-     ที่เป็นประโยคยาว
-  */
 
   for (
     let blockSize = 3;
@@ -2948,21 +2932,12 @@ function cleanTranslationResult(
     String(text).trim();
 
 
-  /*
-     ลบช่องว่างซ้ำ
-  */
-
   cleaned =
     cleaned.replace(
       /[ \t]+/g,
       " "
     );
 
-
-  /*
-     ลบเครดิตแบบ OCR
-     ถ้าระบบแปลติดมาด้วย
-  */
 
   cleaned =
     cleaned.replace(
@@ -2978,19 +2953,11 @@ function cleanTranslationResult(
     );
 
 
-  /*
-     ลบข้อความซ้ำ
-  */
-
   cleaned =
     removeDuplicateTranslationBlocks(
       cleaned
     );
 
-
-  /*
-     จัดบรรทัดว่าง
-  */
 
   cleaned =
     cleaned.replace(
@@ -3119,10 +3086,6 @@ async function translateText() {
 
     }
 
-
-    /*
-       ทำความสะอาดผลแปลก่อนแสดง
-    */
 
     const translation =
       cleanTranslationResult(
