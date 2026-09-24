@@ -2,8 +2,10 @@
    ผู้ช่วยแปลภาษา
    Thai ↔ English
    script.js
-   OCR: Tesseract.js
-   OCR IMPROVED VERSION
+
+   OCR:
+   Tesseract.js
+   FOCUS CROP OCR VERSION
 ========================================= */
 
 
@@ -478,13 +480,10 @@ removeImageButton.addEventListener(
 
 
 /* =========================================
-   PREPARE IMAGE
+   LOAD IMAGE
 ========================================= */
 
-function prepareOCRImage(
-  file,
-  mode = "normal"
-) {
+function loadImageFromFile(file) {
 
   return new Promise(
     function (resolve, reject) {
@@ -501,357 +500,9 @@ function prepareOCRImage(
           img.onload =
             function () {
 
-              try {
-
-                let width =
-                  img.naturalWidth;
-
-                let height =
-                  img.naturalHeight;
-
-                const minSize =
-                  2400;
-
-                const maxSize =
-                  3600;
-
-
-                /* =================================
-                   ขยายรูปเล็ก
-                ================================= */
-
-                if (
-                  width < minSize &&
-                  height < minSize
-                ) {
-
-                  const scale =
-                    Math.max(
-                      minSize / width,
-                      minSize / height
-                    );
-
-                  width =
-                    Math.round(
-                      width * scale
-                    );
-
-                  height =
-                    Math.round(
-                      height * scale
-                    );
-
-                }
-
-
-                /* =================================
-                   ลดรูปใหญ่
-                ================================= */
-
-                if (
-                  width > maxSize ||
-                  height > maxSize
-                ) {
-
-                  const scale =
-                    Math.min(
-                      maxSize / width,
-                      maxSize / height
-                    );
-
-                  width =
-                    Math.round(
-                      width * scale
-                    );
-
-                  height =
-                    Math.round(
-                      height * scale
-                    );
-
-                }
-
-
-                const canvas =
-                  document.createElement(
-                    "canvas"
-                  );
-
-                canvas.width =
-                  width;
-
-                canvas.height =
-                  height;
-
-
-                const ctx =
-                  canvas.getContext(
-                    "2d",
-                    {
-                      willReadFrequently: true
-                    }
-                  );
-
-
-                ctx.imageSmoothingEnabled =
-                  true;
-
-                ctx.imageSmoothingQuality =
-                  "high";
-
-
-                ctx.drawImage(
-                  img,
-                  0,
-                  0,
-                  width,
-                  height
-                );
-
-
-                /* =================================
-                   ORIGINAL
-                ================================= */
-
-                if (
-                  mode === "original"
-                ) {
-
-                  resolve(
-                    canvas.toDataURL(
-                      "image/png"
-                    )
-                  );
-
-                  return;
-
-                }
-
-
-                const imageData =
-                  ctx.getImageData(
-                    0,
-                    0,
-                    width,
-                    height
-                  );
-
-                const pixels =
-                  imageData.data;
-
-
-                /* =================================
-                   NORMAL
-                ================================= */
-
-                if (
-                  mode === "normal"
-                ) {
-
-                  const contrast =
-                    1.22;
-
-                  const factor =
-                    (259 *
-                      (contrast + 255)) /
-                    (255 *
-                      (259 - contrast));
-
-
-                  for (
-                    let i = 0;
-                    i < pixels.length;
-                    i += 4
-                  ) {
-
-                    const r =
-                      pixels[i];
-
-                    const g =
-                      pixels[i + 1];
-
-                    const b =
-                      pixels[i + 2];
-
-
-                    let gray =
-                      (0.299 * r) +
-                      (0.587 * g) +
-                      (0.114 * b);
-
-
-                    gray =
-                      factor *
-                      (gray - 128) +
-                      128;
-
-
-                    gray =
-                      Math.max(
-                        0,
-                        Math.min(
-                          255,
-                          gray
-                        )
-                      );
-
-
-                    pixels[i] =
-                      gray;
-
-                    pixels[i + 1] =
-                      gray;
-
-                    pixels[i + 2] =
-                      gray;
-
-                  }
-
-                }
-
-
-                /* =================================
-                   THRESHOLD
-                ================================= */
-
-                if (
-                  mode === "threshold"
-                ) {
-
-                  for (
-                    let i = 0;
-                    i < pixels.length;
-                    i += 4
-                  ) {
-
-                    const r =
-                      pixels[i];
-
-                    const g =
-                      pixels[i + 1];
-
-                    const b =
-                      pixels[i + 2];
-
-
-                    const gray =
-                      (0.299 * r) +
-                      (0.587 * g) +
-                      (0.114 * b);
-
-
-                    const value =
-                      gray < 170
-                        ? 0
-                        : 255;
-
-
-                    pixels[i] =
-                      value;
-
-                    pixels[i + 1] =
-                      value;
-
-                    pixels[i + 2] =
-                      value;
-
-                  }
-
-                }
-
-
-                /* =================================
-                   SHARP
-                ================================= */
-
-                if (
-                  mode === "sharp"
-                ) {
-
-                  const contrast =
-                    1.38;
-
-                  const factor =
-                    (259 *
-                      (contrast + 255)) /
-                    (255 *
-                      (259 - contrast));
-
-
-                  for (
-                    let i = 0;
-                    i < pixels.length;
-                    i += 4
-                  ) {
-
-                    const r =
-                      pixels[i];
-
-                    const g =
-                      pixels[i + 1];
-
-                    const b =
-                      pixels[i + 2];
-
-
-                    let gray =
-                      (0.299 * r) +
-                      (0.587 * g) +
-                      (0.114 * b);
-
-
-                    gray =
-                      factor *
-                      (gray - 128) +
-                      128;
-
-
-                    gray =
-                      Math.max(
-                        0,
-                        Math.min(
-                          255,
-                          gray
-                        )
-                      );
-
-
-                    pixels[i] =
-                      gray;
-
-                    pixels[i + 1] =
-                      gray;
-
-                    pixels[i + 2] =
-                      gray;
-
-                  }
-
-                }
-
-
-                ctx.putImageData(
-                  imageData,
-                  0,
-                  0
-                );
-
-
-                resolve(
-                  canvas.toDataURL(
-                    "image/png"
-                  )
-                );
-
-
-              } catch (error) {
-
-                reject(error);
-
-              }
+              resolve(img);
 
             };
-
 
           img.onerror =
             function () {
@@ -864,12 +515,10 @@ function prepareOCRImage(
 
             };
 
-
           img.src =
             event.target.result;
 
         };
-
 
       reader.onerror =
         function () {
@@ -882,7 +531,6 @@ function prepareOCRImage(
 
         };
 
-
       reader.readAsDataURL(file);
 
     }
@@ -892,331 +540,618 @@ function prepareOCRImage(
 
 
 /* =========================================
-   REBUILD TEXT FROM WORD POSITIONS
+   DRAW IMAGE TO CANVAS
 ========================================= */
 
-function rebuildTextFromWords(words) {
+function drawImageToCanvas(
+  img,
+  options = {}
+) {
 
-  if (
-    !Array.isArray(words) ||
-    words.length === 0
-  ) {
+  const cropX =
+    options.cropX || 0;
 
-    return "";
+  const cropY =
+    options.cropY || 0;
 
-  }
+  const cropWidth =
+    options.cropWidth ||
+    img.naturalWidth;
 
+  const cropHeight =
+    options.cropHeight ||
+    img.naturalHeight;
 
-  const validWords =
-    words
-      .filter(
-        function (word) {
+  const targetWidth =
+    options.targetWidth ||
+    3000;
 
-          return (
-            word &&
-            word.text &&
-            word.text.trim() &&
-            word.bbox
-          );
+  const scale =
+    targetWidth / cropWidth;
 
-        }
-      )
-      .map(
-        function (word) {
-
-          return {
-
-            text:
-              word.text.trim(),
-
-            x0:
-              Number(word.bbox.x0) || 0,
-
-            y0:
-              Number(word.bbox.y0) || 0,
-
-            x1:
-              Number(word.bbox.x1) || 0,
-
-            y1:
-              Number(word.bbox.y1) || 0
-
-          };
-
-        }
-      );
+  const targetHeight =
+    Math.round(
+      cropHeight * scale
+    );
 
 
-  if (
-    validWords.length === 0
-  ) {
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
 
-    return "";
+  canvas.width =
+    targetWidth;
 
-  }
+  canvas.height =
+    targetHeight;
 
 
-  /*
-   * ลบคำที่เป็นเศษสัญลักษณ์ล้วน
-   */
-
-  const filteredWords =
-    validWords.filter(
-      function (word) {
-
-        const useful =
-          word.text.match(
-            /[ก-๙a-zA-Z0-9]/
-          );
-
-        return !!useful;
-
+  const ctx =
+    canvas.getContext(
+      "2d",
+      {
+        willReadFrequently: true
       }
     );
 
 
-  if (
-    filteredWords.length === 0
-  ) {
+  ctx.imageSmoothingEnabled =
+    true;
 
-    return "";
-
-  }
+  ctx.imageSmoothingQuality =
+    "high";
 
 
-  filteredWords.sort(
-    function (a, b) {
+  ctx.fillStyle =
+    "#ffffff";
 
-      if (
-        a.y0 !== b.y0
-      ) {
-
-        return a.y0 - b.y0;
-
-      }
-
-      return a.x0 - b.x0;
-
-    }
+  ctx.fillRect(
+    0,
+    0,
+    targetWidth,
+    targetHeight
   );
 
 
-  const lines = [];
+  ctx.drawImage(
+    img,
+    cropX,
+    cropY,
+    cropWidth,
+    cropHeight,
+    0,
+    0,
+    targetWidth,
+    targetHeight
+  );
+
+
+  return canvas;
+
+}
+
+
+/* =========================================
+   PREPARE OCR IMAGE
+========================================= */
+
+async function prepareOCRImage(
+  file,
+  mode = "normal"
+) {
+
+  const img =
+    await loadImageFromFile(
+      file
+    );
+
+
+  const originalWidth =
+    img.naturalWidth;
+
+  const originalHeight =
+    img.naturalHeight;
 
 
   /*
-   * รวมคำที่อยู่ในบรรทัดเดียวกัน
+   * FULL IMAGE
    */
 
-  filteredWords.forEach(
-    function (word) {
+  if (
+    mode === "original"
+  ) {
 
-      const centerY =
-        (word.y0 + word.y1) / 2;
+    const canvas =
+      drawImageToCanvas(
+        img,
+        {
+          cropX:
+            0,
 
-      const height =
-        Math.max(
-          1,
-          word.y1 - word.y0
-        );
+          cropY:
+            0,
 
+          cropWidth:
+            originalWidth,
 
-      let targetLine =
-        null;
+          cropHeight:
+            originalHeight,
 
-
-      for (
-        let i = 0;
-        i < lines.length;
-        i++
-      ) {
-
-        const line =
-          lines[i];
-
-
-        const difference =
-          Math.abs(
-            centerY -
-            line.centerY
-          );
-
-
-        /*
-         * ใช้ tolerance ที่แคบลง
-         * เพื่อไม่ให้คนละบรรทัด
-         * ถูกจับมารวมกัน
-         */
-
-        const tolerance =
-          Math.max(
-            8,
+          targetWidth:
             Math.min(
-              height,
-              line.averageHeight
-            ) * 0.55
-          );
-
-
-        if (
-          difference <=
-          tolerance
-        ) {
-
-          targetLine =
-            line;
-
-          break;
-
+              3600,
+              Math.max(
+                2400,
+                originalWidth
+              )
+            )
         }
-
-      }
-
-
-      if (!targetLine) {
-
-        targetLine = {
-
-          words: [],
-
-          centerY:
-            centerY,
-
-          averageHeight:
-            height
-
-        };
-
-        lines.push(
-          targetLine
-        );
-
-      }
-
-
-      targetLine.words.push(
-        word
       );
 
 
-      targetLine.centerY =
-        (
-          targetLine.centerY +
-          centerY
-        ) / 2;
+    return canvas.toDataURL(
+      "image/png"
+    );
+
+  }
 
 
-      targetLine.averageHeight =
-        (
-          targetLine.averageHeight +
-          height
-        ) / 2;
+  /*
+   * FOCUS CROP
+   *
+   * ตัดพื้นที่ประมาณกลางถึงล่าง
+   * เพราะบริเวณนี้มักเป็นข้อความ
+   */
 
-    }
-  );
+  if (
+    mode === "focus"
+  ) {
 
+    let cropX =
+      Math.round(
+        originalWidth * 0.06
+      );
 
-  lines.sort(
-    function (a, b) {
+    let cropY =
+      Math.round(
+        originalHeight * 0.25
+      );
 
-      return a.centerY -
-        b.centerY;
+    let cropWidth =
+      Math.round(
+        originalWidth * 0.88
+      );
 
-    }
-  );
-
-
-  const output =
-    lines.map(
-      function (line) {
-
-        line.words.sort(
-          function (a, b) {
-
-            return a.x0 -
-              b.x0;
-
-          }
-        );
+    let cropHeight =
+      Math.round(
+        originalHeight * 0.68
+      );
 
 
-        let lineText =
-          "";
+    /*
+     * ป้องกันเกินขอบ
+     */
+
+    cropX =
+      Math.max(
+        0,
+        cropX
+      );
+
+    cropY =
+      Math.max(
+        0,
+        cropY
+      );
 
 
-        line.words.forEach(
-          function (word, index) {
+    cropWidth =
+      Math.min(
+        cropWidth,
+        originalWidth - cropX
+      );
 
-            if (
-              index === 0
-            ) {
-
-              lineText =
-                word.text;
-
-              return;
-
-            }
+    cropHeight =
+      Math.min(
+        cropHeight,
+        originalHeight - cropY
+      );
 
 
-            const previous =
-              line.words[index - 1];
+    const canvas =
+      drawImageToCanvas(
+        img,
+        {
+          cropX:
+            cropX,
+
+          cropY:
+            cropY,
+
+          cropWidth:
+            cropWidth,
+
+          cropHeight:
+            cropHeight,
+
+          targetWidth:
+            3600
+        }
+      );
 
 
-            const gap =
-              word.x0 -
-              previous.x1;
+    return canvas.toDataURL(
+      "image/png"
+    );
+
+  }
 
 
-            const averageHeight =
-              Math.max(
-                1,
-                line.averageHeight
-              );
+  /*
+   * LOWER CROP
+   */
+
+  if (
+    mode === "lower"
+  ) {
+
+    const cropX =
+      Math.round(
+        originalWidth * 0.05
+      );
+
+    const cropY =
+      Math.round(
+        originalHeight * 0.38
+      );
+
+    const cropWidth =
+      Math.round(
+        originalWidth * 0.90
+      );
+
+    const cropHeight =
+      Math.round(
+        originalHeight * 0.55
+      );
 
 
-            /*
-             * ถ้าคำอยู่ติดกันมาก
-             * ไม่ใส่ช่องว่าง
-             *
-             * เหมาะกับภาษาไทย
-             */
+    const canvas =
+      drawImageToCanvas(
+        img,
+        {
+          cropX:
+            cropX,
 
-            if (
-              gap <
-              averageHeight * 0.18
-            ) {
+          cropY:
+            cropY,
 
-              lineText +=
-                word.text;
+          cropWidth:
+            cropWidth,
 
-            } else {
+          cropHeight:
+            cropHeight,
 
-              lineText +=
-                " " +
-                word.text;
-
-            }
-
-          }
-        );
+          targetWidth:
+            3600
+        }
+      );
 
 
-        return lineText.trim();
+    return canvas.toDataURL(
+      "image/png"
+    );
 
+  }
+
+
+  /*
+   * CENTER CROP
+   */
+
+  if (
+    mode === "center"
+  ) {
+
+    const cropX =
+      Math.round(
+        originalWidth * 0.10
+      );
+
+    const cropY =
+      Math.round(
+        originalHeight * 0.20
+      );
+
+    const cropWidth =
+      Math.round(
+        originalWidth * 0.80
+      );
+
+    const cropHeight =
+      Math.round(
+        originalHeight * 0.60
+      );
+
+
+    const canvas =
+      drawImageToCanvas(
+        img,
+        {
+          cropX:
+            cropX,
+
+          cropY:
+            cropY,
+
+          cropWidth:
+            cropWidth,
+
+          cropHeight:
+            cropHeight,
+
+          targetWidth:
+            3600
+        }
+      );
+
+
+    return canvas.toDataURL(
+      "image/png"
+    );
+
+  }
+
+
+  /*
+   * NORMAL / THRESHOLD / SHARP
+   */
+
+  const canvas =
+    drawImageToCanvas(
+      img,
+      {
+        cropX:
+          0,
+
+        cropY:
+          0,
+
+        cropWidth:
+          originalWidth,
+
+        cropHeight:
+          originalHeight,
+
+        targetWidth:
+          3200
       }
     );
 
 
-  return output
-    .filter(
-      function (line) {
-
-        return line.length > 0;
-
+  const ctx =
+    canvas.getContext(
+      "2d",
+      {
+        willReadFrequently: true
       }
-    )
-    .join("\n");
+    );
+
+
+  const imageData =
+    ctx.getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+
+  const pixels =
+    imageData.data;
+
+
+  /*
+   * NORMAL
+   */
+
+  if (
+    mode === "normal"
+  ) {
+
+    const contrast =
+      1.18;
+
+    const factor =
+      (259 *
+        (contrast + 255)) /
+      (255 *
+        (259 - contrast));
+
+
+    for (
+      let i = 0;
+      i < pixels.length;
+      i += 4
+    ) {
+
+      const r =
+        pixels[i];
+
+      const g =
+        pixels[i + 1];
+
+      const b =
+        pixels[i + 2];
+
+
+      let gray =
+        (0.299 * r) +
+        (0.587 * g) +
+        (0.114 * b);
+
+
+      gray =
+        factor *
+        (gray - 128) +
+        128;
+
+
+      gray =
+        Math.max(
+          0,
+          Math.min(
+            255,
+            gray
+          )
+        );
+
+
+      pixels[i] =
+        gray;
+
+      pixels[i + 1] =
+        gray;
+
+      pixels[i + 2] =
+        gray;
+
+    }
+
+  }
+
+
+  /*
+   * THRESHOLD
+   */
+
+  if (
+    mode === "threshold"
+  ) {
+
+    for (
+      let i = 0;
+      i < pixels.length;
+      i += 4
+    ) {
+
+      const r =
+        pixels[i];
+
+      const g =
+        pixels[i + 1];
+
+      const b =
+        pixels[i + 2];
+
+
+      const gray =
+        (0.299 * r) +
+        (0.587 * g) +
+        (0.114 * b);
+
+
+      const value =
+        gray < 175
+          ? 0
+          : 255;
+
+
+      pixels[i] =
+        value;
+
+      pixels[i + 1] =
+        value;
+
+      pixels[i + 2] =
+        value;
+
+    }
+
+  }
+
+
+  /*
+   * SHARP
+   */
+
+  if (
+    mode === "sharp"
+  ) {
+
+    const contrast =
+      1.32;
+
+    const factor =
+      (259 *
+        (contrast + 255)) /
+      (255 *
+        (259 - contrast));
+
+
+    for (
+      let i = 0;
+      i < pixels.length;
+      i += 4
+    ) {
+
+      const r =
+        pixels[i];
+
+      const g =
+        pixels[i + 1];
+
+      const b =
+        pixels[i + 2];
+
+
+      let gray =
+        (0.299 * r) +
+        (0.587 * g) +
+        (0.114 * b);
+
+
+      gray =
+        factor *
+        (gray - 128) +
+        128;
+
+
+      gray =
+        Math.max(
+          0,
+          Math.min(
+            255,
+            gray
+          )
+        );
+
+
+      pixels[i] =
+        gray;
+
+      pixels[i + 1] =
+        gray;
+
+      pixels[i + 2] =
+        gray;
+
+    }
+
+  }
+
+
+  ctx.putImageData(
+    imageData,
+    0,
+    0
+  );
+
+
+  return canvas.toDataURL(
+    "image/png"
+  );
 
 }
 
@@ -1260,7 +1195,7 @@ async function recognizeOCR(
     );
 
 
-  const rawText =
+  const text =
     String(
       result &&
       result.data &&
@@ -1268,32 +1203,6 @@ async function recognizeOCR(
         ? result.data.text
         : ""
     ).trim();
-
-
-  const words =
-    result &&
-    result.data &&
-    Array.isArray(
-      result.data.words
-    )
-      ? result.data.words
-      : [];
-
-
-  let rebuiltText =
-    "";
-
-
-  if (
-    words.length > 0
-  ) {
-
-    rebuiltText =
-      rebuildTextFromWords(
-        words
-      );
-
-  }
 
 
   const confidence =
@@ -1313,11 +1222,8 @@ async function recognizeOCR(
       confidence:
         confidence,
 
-      raw:
-        rawText,
-
-      rebuilt:
-        rebuiltText
+      text:
+        text
     }
   );
 
@@ -1325,13 +1231,7 @@ async function recognizeOCR(
   return {
 
     text:
-      rawText,
-
-    rawText:
-      rawText,
-
-    rebuiltText:
-      rebuiltText,
+      text,
 
     confidence:
       confidence,
@@ -1345,84 +1245,7 @@ async function recognizeOCR(
 
 
 /* =========================================
-   CREATE OCR CANDIDATES
-========================================= */
-
-function createOCRCandidates(results) {
-
-  const candidates = [];
-
-
-  results.forEach(
-    function (result) {
-
-      if (
-        !result
-      ) {
-        return;
-      }
-
-
-      if (
-        result.rawText &&
-        result.rawText.trim()
-      ) {
-
-        candidates.push({
-
-          text:
-            result.rawText.trim(),
-
-          confidence:
-            result.confidence,
-
-          mode:
-            result.mode +
-            " / raw",
-
-          sourceMode:
-            result.mode
-
-        });
-
-      }
-
-
-      if (
-        result.rebuiltText &&
-        result.rebuiltText.trim()
-      ) {
-
-        candidates.push({
-
-          text:
-            result.rebuiltText.trim(),
-
-          confidence:
-            result.confidence,
-
-          mode:
-            result.mode +
-            " / position",
-
-          sourceMode:
-            result.mode
-
-        });
-
-      }
-
-    }
-  );
-
-
-  return candidates;
-
-}
-
-
-/* =========================================
-   SCORE OCR RESULT
+   SCORE OCR
 ========================================= */
 
 function scoreOCRResult(
@@ -1443,69 +1266,61 @@ function scoreOCRResult(
     result.text.trim();
 
 
-  if (!text) {
-    return -999;
-  }
-
-
-  const usefulMatches =
+  const useful =
     text.match(
       /[ก-๙a-zA-Z0-9]/g
     );
 
 
   const usefulCount =
-    usefulMatches
-      ? usefulMatches.length
+    useful
+      ? useful.length
       : 0;
 
 
-  const totalCount =
-    text.replace(
-      /\s/g,
-      ""
-    ).length;
+  if (
+    usefulCount === 0
+  ) {
+
+    return -999;
+
+  }
 
 
-  const usefulRatio =
-    totalCount > 0
-      ? usefulCount / totalCount
-      : 0;
-
-
-  const thaiMatches =
+  const thai =
     text.match(
       /[ก-๙]/g
     );
 
 
   const thaiCount =
-    thaiMatches
-      ? thaiMatches.length
+    thai
+      ? thai.length
       : 0;
 
 
-  const englishMatches =
+  const english =
     text.match(
       /[a-zA-Z]/g
     );
 
 
   const englishCount =
-    englishMatches
-      ? englishMatches.length
+    english
+      ? english.length
       : 0;
 
 
-  const numberMatches =
-    text.match(
-      /[0-9]/g
-    );
+  const total =
+    text.replace(
+      /\s/g,
+      ""
+    ).length;
 
 
-  const numberCount =
-    numberMatches
-      ? numberMatches.length
+  const ratio =
+    total > 0
+      ? usefulCount / total
       : 0;
 
 
@@ -1516,20 +1331,15 @@ function scoreOCRResult(
 
 
   let score =
-    confidence * 0.45;
+    confidence * 0.40;
 
 
   score +=
-    usefulRatio * 35;
+    ratio * 40;
 
-
-  /*
-   * ภาษาไทย
-   */
 
   if (
-    sourceLanguage === "th" &&
-    thaiCount >= 3
+    thaiCount >= 5
   ) {
 
     score += 10;
@@ -1538,47 +1348,16 @@ function scoreOCRResult(
 
 
   if (
-    sourceLanguage === "th" &&
-    thaiCount >= 10
+    thaiCount >= 15
   ) {
 
-    score += 10;
+    score += 8;
 
   }
 
-
-  /*
-   * ภาษาอังกฤษ
-   */
 
   if (
     englishCount >= 5
-  ) {
-
-    score += 5;
-
-  }
-
-
-  /*
-   * ตัวเลข
-   */
-
-  if (
-    numberCount >= 2
-  ) {
-
-    score += 2;
-
-  }
-
-
-  /*
-   * มีข้อความมากพอ
-   */
-
-  if (
-    usefulCount >= 5
   ) {
 
     score += 5;
@@ -1605,55 +1384,104 @@ function scoreOCRResult(
 
 
   /*
-   * ลงโทษอักขระแปลก
+   * ลงโทษคำอังกฤษมั่วยาว ๆ
    */
 
-  const strangeMatches =
+  const longEnglish =
     text.match(
-      /[^ก-๙a-zA-Z0-9\s.,!?()\-:/'%&+]/g
-    );
-
-
-  const strangeCount =
-    strangeMatches
-      ? strangeMatches.length
-      : 0;
-
-
-  score -=
-    Math.min(
-      25,
-      strangeCount * 0.8
-    );
-
-
-  /*
-   * ลงโทษคำภาษาอังกฤษที่ยาวผิดปกติ
-   * เพราะมักเกิดจาก OCR ภาษาไทยอ่านมั่ว
-   */
-
-  const strangeEnglishWords =
-    text.match(
-      /\b[a-zA-Z]{12,}\b/g
+      /\b[a-zA-Z]{13,}\b/g
     );
 
 
   if (
-    strangeEnglishWords
+    longEnglish
   ) {
 
     score -=
-      strangeEnglishWords.length * 3;
+      longEnglish.length * 4;
 
   }
 
 
   /*
-   * ลงโทษบรรทัดสั้น ๆ ที่เป็นเศษ
+   * ลงโทษสัญลักษณ์มั่ว
    */
 
+  const strange =
+    text.match(
+      /[^ก-๙a-zA-Z0-9\s.,!?()\-:/'%&+]/g
+    );
+
+
+  if (
+    strange
+  ) {
+
+    score -=
+      Math.min(
+        20,
+        strange.length * 0.7
+      );
+
+  }
+
+
+  return score;
+
+}
+
+
+/* =========================================
+   CLEAN OCR
+========================================= */
+
+function cleanOCRText(
+  text
+) {
+
+  if (!text) {
+    return "";
+  }
+
+
+  let cleaned =
+    String(text);
+
+
+  cleaned =
+    cleaned.replace(
+      /\r\n/g,
+      "\n"
+    );
+
+
+  cleaned =
+    cleaned.replace(
+      /\r/g,
+      "\n"
+    );
+
+
+  cleaned =
+    cleaned.replace(
+      /[ \t]+/g,
+      " "
+    );
+
+
+  /*
+   * ลบบรรทัดที่เป็นสัญลักษณ์ล้วน
+   */
+
+  cleaned =
+    cleaned.replace(
+      /^[*|_~`.,;:!?+\-=\/\\]+$/gm,
+      ""
+    );
+
+
   const lines =
-    text
+    cleaned
       .split("\n")
       .map(
         function (line) {
@@ -1665,74 +1493,60 @@ function scoreOCRResult(
       .filter(
         function (line) {
 
-          return line.length > 0;
+          if (!line) {
+            return false;
+          }
+
+
+          const useful =
+            line.match(
+              /[ก-๙a-zA-Z0-9]/g
+            );
+
+
+          const count =
+            useful
+              ? useful.length
+              : 0;
+
+
+          if (
+            count === 0
+          ) {
+
+            return false;
+
+          }
+
+
+          if (
+            count === 1 &&
+            line.length <= 3
+          ) {
+
+            return false;
+
+          }
+
+
+          return true;
 
         }
       );
 
 
-  let shortGarbageLines =
-    0;
+  cleaned =
+    lines.join("\n");
 
 
-  lines.forEach(
-    function (line) {
-
-      const useful =
-        line.match(
-          /[ก-๙a-zA-Z0-9]/g
-        );
-
-
-      const count =
-        useful
-          ? useful.length
-          : 0;
-
-
-      if (
-        count <= 1
-      ) {
-
-        shortGarbageLines++;
-
-      }
-
-    }
-  );
-
-
-  score -=
-    Math.min(
-      12,
-      shortGarbageLines * 2
+  cleaned =
+    cleaned.replace(
+      /\n{3,}/g,
+      "\n\n"
     );
 
 
-  /*
-   * ถ้ามีภาษาไทยหลายคำ
-   * ให้โบนัสเพิ่มเติม
-   */
-
-  if (
-    thaiCount >= 20
-  ) {
-
-    score += 8;
-
-  }
-
-
-  if (
-    usefulCount < 3
-  ) {
-
-    score -= 40;
-
-  }
-
-
-  return score;
+  return cleaned.trim();
 
 }
 
@@ -1745,12 +1559,6 @@ function selectBestOCRResult(
   results
 ) {
 
-  const candidates =
-    createOCRCandidates(
-      results
-    );
-
-
   let best =
     null;
 
@@ -1758,21 +1566,29 @@ function selectBestOCRResult(
     -999;
 
 
-  candidates.forEach(
-    function (candidate) {
+  results.forEach(
+    function (result) {
+
+      if (
+        !result ||
+        !result.text
+      ) {
+
+        return;
+
+      }
+
 
       const score =
         scoreOCRResult(
-          candidate
+          result
         );
 
 
       console.log(
-        "OCR CANDIDATE:",
-        candidate.mode,
-        "SCORE:",
-        score,
-        candidate.text
+        "OCR SCORE:",
+        result.mode,
+        score
       );
 
 
@@ -1782,7 +1598,7 @@ function selectBestOCRResult(
       ) {
 
         best =
-          candidate;
+          result;
 
         bestScore =
           score;
@@ -1791,67 +1607,6 @@ function selectBestOCRResult(
 
     }
   );
-
-
-  /*
-   * ถ้าผลที่จัดตำแหน่งใหม่
-   * แย่กว่าข้อความดิบมาก
-   * ให้กลับไปใช้ raw
-   */
-
-  if (
-    best &&
-    best.mode.includes("position")
-  ) {
-
-    const sameSource =
-      candidates.find(
-        function (candidate) {
-
-          return (
-            candidate.sourceMode ===
-            best.sourceMode &&
-            candidate.mode.includes(
-              "raw"
-            )
-          );
-
-        }
-      );
-
-
-    if (
-      sameSource
-    ) {
-
-      const rawScore =
-        scoreOCRResult(
-          sameSource
-        );
-
-
-      if (
-        rawScore >
-        bestScore - 3
-      ) {
-
-        /*
-         * ถ้าคะแนนใกล้กัน
-         * ใช้ raw เพราะ Tesseract
-         * มักจัดบรรทัดได้ดีกว่า
-         */
-
-        best =
-          sameSource;
-
-        bestScore =
-          rawScore;
-
-      }
-
-    }
-
-  }
 
 
   console.log(
@@ -1886,7 +1641,9 @@ function selectBestOCRResult(
    TESSERACT OCR
 ========================================= */
 
-async function runOCR(file) {
+async function runOCR(
+  file
+) {
 
   ocrCard.hidden =
     false;
@@ -1902,19 +1659,158 @@ async function runOCR(file) {
       await getTesseractWorker();
 
 
+    const results = [];
+
+
     /* =====================================
        PASS 1
-       ORIGINAL + PSM 11
+       FOCUS CROP + PSM 6
+
+       ⭐ สำคัญสำหรับรูปตัวอย่าง
     ===================================== */
 
     ocrText.value =
-      "กำลังอ่านข้อความรอบที่ 1...";
+      "กำลังอ่านข้อความจากบริเวณข้อความ...";
 
 
     showStatus(
-      "กำลังวิเคราะห์ภาพรอบที่ 1...",
+      "กำลังโฟกัสบริเวณข้อความ...",
       "success"
     );
+
+
+    const focusImage =
+      await prepareOCRImage(
+        file,
+        "focus"
+      );
+
+
+    const focusResult =
+      await recognizeOCR(
+        worker,
+        focusImage,
+        "focus",
+        6
+      );
+
+
+    results.push(
+      focusResult
+    );
+
+
+    /* =====================================
+       PASS 2
+       FOCUS CROP + PSM 11
+    ===================================== */
+
+    ocrText.value =
+      "กำลังอ่านข้อความแบบละเอียด...";
+
+
+    const focusSparseResult =
+      await recognizeOCR(
+        worker,
+        focusImage,
+        "focus-sparse",
+        11
+      );
+
+
+    results.push(
+      focusSparseResult
+    );
+
+
+    /* =====================================
+       PASS 3
+       LOWER CROP + PSM 6
+    ===================================== */
+
+    ocrText.value =
+      "กำลังอ่านข้อความส่วนล่าง...";
+
+
+    const lowerImage =
+      await prepareOCRImage(
+        file,
+        "lower"
+      );
+
+
+    const lowerResult =
+      await recognizeOCR(
+        worker,
+        lowerImage,
+        "lower",
+        6
+      );
+
+
+    results.push(
+      lowerResult
+    );
+
+
+    /* =====================================
+       PASS 4
+       LOWER CROP + PSM 11
+    ===================================== */
+
+    const lowerSparseResult =
+      await recognizeOCR(
+        worker,
+        lowerImage,
+        "lower-sparse",
+        11
+      );
+
+
+    results.push(
+      lowerSparseResult
+    );
+
+
+    /* =====================================
+       PASS 5
+       CENTER CROP + PSM 6
+    ===================================== */
+
+    ocrText.value =
+      "กำลังตรวจสอบข้อความอีกครั้ง...";
+
+
+    const centerImage =
+      await prepareOCRImage(
+        file,
+        "center"
+      );
+
+
+    const centerResult =
+      await recognizeOCR(
+        worker,
+        centerImage,
+        "center",
+        6
+      );
+
+
+    results.push(
+      centerResult
+    );
+
+
+    /* =====================================
+       PASS 6
+       FULL IMAGE + PSM 11
+
+       ใช้เป็นตัวสำรอง
+    ===================================== */
+
+    ocrText.value =
+      "กำลังตรวจสอบภาพทั้งหมด...";
 
 
     const originalImage =
@@ -1924,7 +1820,7 @@ async function runOCR(file) {
       );
 
 
-    const resultOriginal =
+    const originalResult =
       await recognizeOCR(
         worker,
         originalImage,
@@ -1933,128 +1829,9 @@ async function runOCR(file) {
       );
 
 
-    /* =====================================
-       PASS 2
-       NORMAL + PSM 11
-    ===================================== */
-
-    ocrText.value =
-      "กำลังอ่านข้อความรอบที่ 2...";
-
-
-    showStatus(
-      "กำลังวิเคราะห์ภาพรอบที่ 2...",
-      "success"
+    results.push(
+      originalResult
     );
-
-
-    const normalSparseImage =
-      await prepareOCRImage(
-        file,
-        "normal"
-      );
-
-
-    const resultNormalSparse =
-      await recognizeOCR(
-        worker,
-        normalSparseImage,
-        "normal-sparse",
-        11
-      );
-
-
-    /* =====================================
-       PASS 3
-       NORMAL + PSM 6
-    ===================================== */
-
-    ocrText.value =
-      "กำลังอ่านข้อความรอบที่ 3...";
-
-
-    showStatus(
-      "กำลังวิเคราะห์ภาพรอบที่ 3...",
-      "success"
-    );
-
-
-    const normalImage =
-      await prepareOCRImage(
-        file,
-        "normal"
-      );
-
-
-    const resultNormal =
-      await recognizeOCR(
-        worker,
-        normalImage,
-        "normal",
-        6
-      );
-
-
-    /* =====================================
-       PASS 4
-       THRESHOLD + PSM 11
-    ===================================== */
-
-    ocrText.value =
-      "กำลังอ่านข้อความรอบที่ 4...";
-
-
-    showStatus(
-      "กำลังวิเคราะห์ภาพรอบที่ 4...",
-      "success"
-    );
-
-
-    const thresholdImage =
-      await prepareOCRImage(
-        file,
-        "threshold"
-      );
-
-
-    const resultThreshold =
-      await recognizeOCR(
-        worker,
-        thresholdImage,
-        "threshold",
-        11
-      );
-
-
-    /* =====================================
-       PASS 5
-       SHARP + PSM 6
-    ===================================== */
-
-    ocrText.value =
-      "กำลังอ่านข้อความรอบสุดท้าย...";
-
-
-    showStatus(
-      "กำลังวิเคราะห์ภาพรอบสุดท้าย...",
-      "success"
-    );
-
-
-    const sharpImage =
-      await prepareOCRImage(
-        file,
-        "sharp"
-      );
-
-
-    const resultSharp =
-      await recognizeOCR(
-        worker,
-        sharpImage,
-        "sharp",
-        6
-      );
 
 
     /* =====================================
@@ -2062,13 +1839,9 @@ async function runOCR(file) {
     ===================================== */
 
     const bestResult =
-      selectBestOCRResult([
-        resultOriginal,
-        resultNormalSparse,
-        resultNormal,
-        resultThreshold,
-        resultSharp
-      ]);
+      selectBestOCRResult(
+        results
+      );
 
 
     if (
@@ -2105,18 +1878,29 @@ async function runOCR(file) {
 
 
     console.log(
-      "OCR FINAL:",
-      {
-        mode:
-          bestResult.mode,
+      "================================="
+    );
 
-        confidence:
-          bestResult.confidence,
+    console.log(
+      "OCR FINAL"
+    );
 
-        text:
-          cleanedText
+    console.log(
+      "MODE:",
+      bestResult.mode
+    );
 
-      }
+    console.log(
+      "CONFIDENCE:",
+      bestResult.confidence
+    );
+
+    console.log(
+      cleanedText
+    );
+
+    console.log(
+      "================================="
     );
 
 
@@ -2145,141 +1929,6 @@ async function runOCR(file) {
     );
 
   }
-
-}
-
-
-/* =========================================
-   CLEAN OCR
-========================================= */
-
-function cleanOCRText(text) {
-
-  if (!text) {
-    return "";
-  }
-
-
-  let cleaned =
-    String(text);
-
-
-  cleaned =
-    cleaned.replace(
-      /\r\n/g,
-      "\n"
-    );
-
-
-  cleaned =
-    cleaned.replace(
-      /\r/g,
-      "\n"
-    );
-
-
-  /*
-   * ลบช่องว่างซ้ำ
-   */
-
-  cleaned =
-    cleaned.replace(
-      /[ \t]+/g,
-      " "
-    );
-
-
-  /*
-   * ลบบรรทัดที่มีแต่
-   * เครื่องหมาย
-   */
-
-  cleaned =
-    cleaned.replace(
-      /^[*|_~`.,;:!?+\-=\/\\]+$/gm,
-      ""
-    );
-
-
-  /*
-   * ลบบรรทัดที่เป็น
-   * ตัวอักษร/เครื่องหมายมั่วสั้นมาก
-   */
-
-  cleaned =
-    cleaned
-      .split("\n")
-      .map(
-        function (line) {
-
-          return line.trim();
-
-        }
-      )
-      .filter(
-        function (line) {
-
-          if (!line) {
-            return false;
-          }
-
-
-          const useful =
-            line.match(
-              /[ก-๙a-zA-Z0-9]/g
-            );
-
-
-          const usefulCount =
-            useful
-              ? useful.length
-              : 0;
-
-
-          /*
-           * ถ้าเป็นเพียง
-           * เครื่องหมายหรืออักขระเดียว
-           * ให้ตัดออก
-           */
-
-          if (
-            usefulCount === 0
-          ) {
-
-            return false;
-
-          }
-
-
-          if (
-            usefulCount === 1 &&
-            line.length <= 3
-          ) {
-
-            return false;
-
-          }
-
-
-          return true;
-
-        }
-      )
-      .join("\n");
-
-
-  /*
-   * ลดบรรทัดว่างซ้ำ
-   */
-
-  cleaned =
-    cleaned.replace(
-      /\n{3,}/g,
-      "\n\n"
-    );
-
-
-  return cleaned.trim();
 
 }
 
@@ -2907,5 +2556,5 @@ resultText.classList.add(
 
 
 console.log(
-  "🌐 ผู้ช่วยแปลภาษา + Tesseract.js OCR IMPROVED VERSION พร้อมใช้งาน"
+  "🌐 ผู้ช่วยแปลภาษา + Focus Crop OCR พร้อมใช้งาน"
 );
