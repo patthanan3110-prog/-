@@ -1,8 +1,8 @@
 /* =========================================================
    ผู้ช่วยแปลภาษา
    Thai ↔ English
-   SCRIPT.JS - VERSION 58
-   OCR LINE CLEAN + SMART OCR SELECTION
+   SCRIPT.JS - VERSION 59
+   OCR + TRANSLATION API FIX
    ========================================================= */
 
 "use strict";
@@ -982,12 +982,6 @@ async function startOCR(
         fromCamera
       );
 
-    /*
-      ======================================================
-      OCR รอบแรก
-      ======================================================
-    */
-
     const first =
       await recognizeImage(
         worker,
@@ -1000,13 +994,6 @@ async function startOCR(
             first.text
           )
         : "";
-
-    /*
-      ======================================================
-      OCR รอบสอง
-      ทำเฉพาะเมื่อผลแรกมีปัญหา
-      ======================================================
-    */
 
     let finalText =
       firstText;
@@ -1042,24 +1029,12 @@ async function startOCR(
 
     } else {
 
-      /*
-        แม้ผลแรกจะถือว่าใช้ได้
-        แต่ยังทำความสะอาดระดับบรรทัด
-      */
-
       finalText =
         cleanFinalOCRText(
           firstText
         );
 
     }
-
-    /*
-      ======================================================
-      เลือกผล OCR รายบรรทัด
-      ป้องกันบรรทัดขยะจาก OCR
-      ======================================================
-    */
 
     finalText =
       cleanFinalOCRText(
@@ -1074,10 +1049,6 @@ async function startOCR(
 
     }
 
-    /*
-      แสดงข้อความ OCR
-    */
-
     if (ocrText) {
 
       ocrText.value =
@@ -1091,12 +1062,6 @@ async function startOCR(
         false;
 
     }
-
-    /*
-      ======================================================
-      แปลเฉพาะภาษาต้นทาง
-      ======================================================
-    */
 
     showLoading(
       "อ่านข้อความได้แล้ว กำลังแปล..."
@@ -1116,7 +1081,7 @@ async function startOCR(
   } catch (error) {
 
     console.error(
-      "OCR ERROR:",
+      "OCR / TRANSLATION ERROR:",
       error
     );
 
@@ -1124,7 +1089,7 @@ async function startOCR(
 
     showStatus(
       error.message ||
-        "ไม่สามารถอ่านข้อความจากรูปได้",
+        "ไม่สามารถอ่านหรือแปลข้อความได้",
       "error"
     );
 
@@ -1209,10 +1174,6 @@ function chooseBetterOCRText(
     return a;
   }
 
-  /*
-    เลือกผลที่มีคุณภาพโดยรวมดีกว่า
-  */
-
   const scoreA =
     scoreOCR(
       a
@@ -1240,11 +1201,6 @@ function chooseBetterOCRText(
     return a;
 
   }
-
-  /*
-    ถ้าคะแนนใกล้กัน
-    ใช้การรวมบรรทัดที่ดีที่สุด
-  */
 
   return mergeBestOCRLines(
     a,
@@ -1280,11 +1236,6 @@ function mergeBestOCRLines(
           line.trim()
       )
       .filter(Boolean);
-
-  /*
-    ถ้าจำนวนบรรทัดต่างกันมาก
-    ไม่ผสม เพราะอาจทำให้ลำดับข้อความเสีย
-  */
 
   if (
     Math.abs(
@@ -1486,11 +1437,6 @@ function scoreOCRLine(
       letters * 3
     );
 
-  /*
-    ข้อความที่เป็นภาษาจริง
-    มักมีตัวอักษรมากกว่าสัญลักษณ์
-  */
-
   if (
     letters >=
     symbols
@@ -1501,11 +1447,6 @@ function scoreOCRLine(
 
   }
 
-  /*
-    มีตัวอักษรน้อยมาก
-    ไม่ควรได้คะแนนสูง
-  */
-
   if (
     letters <= 2
   ) {
@@ -1514,11 +1455,6 @@ function scoreOCRLine(
       20;
 
   }
-
-  /*
-    บรรทัดที่มีสัญลักษณ์แทรกจำนวนมาก
-    มีโอกาสเป็น OCR ขยะ
-  */
 
   if (
     symbols >= 4 &&
@@ -1529,11 +1465,6 @@ function scoreOCRLine(
       35;
 
   }
-
-  /*
-    ตัวอักษรไทยและอังกฤษปนกันเล็กน้อย
-    สามารถเป็นข้อความจริงได้
-  */
 
   if (
     thai > 0 &&
@@ -1773,12 +1704,6 @@ function cleanOCRLine(
       )
       .trim();
 
-  /*
-    ลบสัญลักษณ์ที่ติดอยู่ด้านหน้า/ท้าย
-    แต่ไม่ลบเครื่องหมายวรรคตอนที่เป็นส่วนหนึ่ง
-    ของประโยคจริง
-  */
-
   value =
     value.replace(
       /^[|_=~]+/g,
@@ -1813,12 +1738,6 @@ function cleanOCRCandidateLine(
     return "";
   }
 
-  /*
-    ถ้าเป็นเศษ OCR ที่มีภาษา
-    แต่มีสัญลักษณ์มากผิดปกติ
-    ให้ทิ้ง
-  */
-
   if (
     isGarbageLine(
       value
@@ -1828,11 +1747,6 @@ function cleanOCRCandidateLine(
     return "";
 
   }
-
-  /*
-    OCR บางครั้งแทรกเครื่องหมายเดี่ยว ๆ
-    ระหว่างข้อความ
-  */
 
   value =
     value.replace(
@@ -1879,11 +1793,6 @@ function cleanFinalOCRText(
       )
       .filter(Boolean);
 
-  /*
-    แก้คำไทยที่ OCR มักอ่านตกตัว
-    โดยจำกัดเฉพาะรูปแบบที่ชัดเจน
-  */
-
   const corrected =
     lines.map(
       line =>
@@ -1910,21 +1819,11 @@ function correctCommonThaiOCR(
   let value =
     String(line);
 
-  /*
-    กรณี OCR อ่าน "เท่านั้น"
-    เป็น "เท่านัน"
-  */
-
   value =
     value.replace(
       /เท่านัน/g,
       "เท่านั้น"
     );
-
-  /*
-    OCR บางครั้งตัดไม้ไต่คู้
-    ในคำที่พบบ่อย
-  */
 
   value =
     value.replace(
@@ -1939,9 +1838,35 @@ function correctCommonThaiOCR(
     );
 
   /*
-    ลบช่องว่างที่หลุดเข้าไป
-    ระหว่างอักษรไทยบางกรณี
+    OCR กรณี
+    กิจะช่วย...
+    ที่จริงมักเป็น
+    ที่จะช่วย...
   */
+
+  value =
+    value.replace(
+      /^กิจะ(?=\s|ช่วย|ทำ|เป็น|ไป|ได้)/,
+      "ที่จะ"
+    );
+
+  value =
+    value.replace(
+      /กิจะช่วย/g,
+      "ที่จะช่วย"
+    );
+
+  value =
+    value.replace(
+      /กิจะทำ/g,
+      "ที่จะทำ"
+    );
+
+  value =
+    value.replace(
+      /กิจะเป็น/g,
+      "ที่จะเป็น"
+    );
 
   value =
     value.replace(
@@ -1996,10 +1921,6 @@ function isGarbageLine(
     letters +
     numbers;
 
-  /*
-    ไม่มีตัวอักษร/ตัวเลขเลย
-  */
-
   if (
     alphanumeric === 0
   ) {
@@ -2007,11 +1928,6 @@ function isGarbageLine(
     return true;
 
   }
-
-  /*
-    เศษสั้น ๆ ที่มีภาษาเพียงนิดเดียว
-    แต่เต็มไปด้วยสัญลักษณ์
-  */
 
   if (
     alphanumeric <= 3 &&
@@ -2022,10 +1938,6 @@ function isGarbageLine(
 
   }
 
-  /*
-    สัญลักษณ์มากกว่าตัวอักษรอย่างชัดเจน
-  */
-
   if (
     symbols >= 4 &&
     symbols >=
@@ -2035,11 +1947,6 @@ function isGarbageLine(
     return true;
 
   }
-
-  /*
-    ตัวอักษรน้อยมาก
-    แต่มีช่องว่างหลายส่วนและสัญลักษณ์
-  */
 
   const words =
     line
@@ -2056,10 +1963,6 @@ function isGarbageLine(
 
   }
 
-  /*
-    ตัวซ้ำยาวผิดธรรมชาติ
-  */
-
   if (
     /(.)\1{7,}/u.test(
       line
@@ -2069,11 +1972,6 @@ function isGarbageLine(
     return true;
 
   }
-
-  /*
-    เศษตัวอักษรไทย/อังกฤษสั้น ๆ
-    ที่มีเครื่องหมายคั่นจำนวนมาก
-  */
 
   if (
     line.length <= 12 &&
@@ -2209,14 +2107,6 @@ function isSourceLine(
 
     }
 
-    /*
-      ป้องกัน OCR เช่น
-      It's only หอน
-
-      ถ้าไทยปนเยอะ
-      จะไม่เอาทั้งบรรทัดไปแปล
-    */
-
     if (
       thai > 0 &&
       thai >=
@@ -2299,6 +2189,26 @@ async function autoTranslateOCR(
 
     }
 
+  } catch (error) {
+
+    console.error(
+      "AUTO TRANSLATE ERROR:",
+      error
+    );
+
+    if (resultText) {
+
+      resultText.textContent =
+        "ไม่สามารถแปลข้อความจากรูปได้";
+
+      resultText.classList.remove(
+        "empty"
+      );
+
+    }
+
+    throw error;
+
   } finally {
 
     translationRunning =
@@ -2319,41 +2229,83 @@ async function translateSingleText(
   target
 ) {
 
-  const response =
-    await fetch(
-      TRANSLATE_API,
-      {
-        method:
-          "POST",
+  const cleanText =
+    String(
+      text || ""
+    ).trim();
 
-        headers: {
-          "Content-Type":
-            "text/plain;charset=utf-8"
-        },
+  if (!cleanText) {
 
-        body:
-          JSON.stringify({
-
-            action:
-              "translate",
-
-            text:
-              text,
-
-            source:
-              source,
-
-            target:
-              target
-
-          })
-      }
+    throw new Error(
+      "ไม่มีข้อความสำหรับแปล"
     );
+
+  }
+
+  /*
+    ใช้ URLSearchParams เพื่อให้
+    Google Apps Script รับ POST ได้ง่าย
+    และลดปัญหา CORS preflight
+  */
+
+  const payload =
+    JSON.stringify({
+
+      action:
+        "translate",
+
+      text:
+        cleanText,
+
+      source:
+        source,
+
+      target:
+        target
+
+    });
+
+  let response;
+
+  try {
+
+    response =
+      await fetch(
+        TRANSLATE_API,
+        {
+          method:
+            "POST",
+
+          headers: {
+            "Content-Type":
+              "text/plain;charset=utf-8"
+          },
+
+          body:
+            payload,
+
+          redirect:
+            "follow"
+        }
+      );
+
+  } catch (error) {
+
+    console.error(
+      "FETCH TRANSLATE ERROR:",
+      error
+    );
+
+    throw new Error(
+      "เชื่อมต่อระบบแปลภาษาไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ต"
+    );
+
+  }
 
   if (!response.ok) {
 
     throw new Error(
-      `เซิร์ฟเวอร์ตอบกลับ ${response.status}`
+      `เซิร์ฟเวอร์แปลภาษาตอบกลับ ${response.status}`
     );
 
   }
@@ -2361,38 +2313,397 @@ async function translateSingleText(
   const raw =
     await response.text();
 
-  let data =
-    null;
-
-  try {
-
-    data =
-      JSON.parse(
-        raw
-      );
-
-  } catch {
-
-    data =
-      null;
-
-  }
+  console.log(
+    "TRANSLATION RAW RESPONSE:",
+    raw
+  );
 
   const translated =
     extractTranslation(
-      data,
+      null,
       raw
     );
 
   if (!translated) {
 
     throw new Error(
-      "ไม่พบคำแปลจากเซิร์ฟเวอร์"
+      "ระบบแปลภาษาไม่ส่งคำแปลกลับมา"
     );
 
   }
 
   return translated.trim();
+
+}
+
+
+/* =========================================================
+   EXTRACT TRANSLATION
+   ========================================================= */
+
+function extractTranslation(
+  data,
+  raw
+) {
+
+  /*
+    ======================================================
+    กรณีมี JSON object อยู่แล้ว
+    ======================================================
+  */
+
+  if (
+    data &&
+    typeof data ===
+      "object"
+  ) {
+
+    const direct =
+      findTranslationValue(
+        data
+      );
+
+    if (direct) {
+
+      return direct;
+
+    }
+
+  }
+
+
+  /*
+    ======================================================
+    อ่าน raw response
+    ======================================================
+  */
+
+  if (
+    typeof raw !==
+      "string"
+  ) {
+
+    return "";
+
+  }
+
+  let value =
+    raw.trim();
+
+  if (!value) {
+
+    return "";
+
+  }
+
+
+  /*
+    บางครั้ง Apps Script
+    อาจส่ง JSON มาเป็น string
+    ======================================================
+  */
+
+  for (
+    let attempt = 0;
+    attempt < 3;
+    attempt++
+  ) {
+
+    try {
+
+      const parsed =
+        JSON.parse(
+          value
+        );
+
+      const found =
+        findTranslationValue(
+          parsed
+        );
+
+      if (found) {
+
+        return found;
+
+      }
+
+      /*
+        ถ้า parsed เป็น string
+        ลอง parse ต่ออีกครั้ง
+      */
+
+      if (
+        typeof parsed ===
+        "string"
+      ) {
+
+        value =
+          parsed.trim();
+
+        continue;
+
+      }
+
+      break;
+
+    } catch {
+
+      break;
+
+    }
+
+  }
+
+
+  /*
+    ======================================================
+    ลบ JSONP / callback ถ้ามี
+    ======================================================
+  */
+
+  value =
+    value.replace(
+      /^\s*[^(]+\(\s*/,
+      ""
+    );
+
+  value =
+    value.replace(
+      /\s*\)\s*;?\s*$/,
+      ""
+    ).trim();
+
+
+  try {
+
+    const parsed =
+      JSON.parse(
+        value
+      );
+
+    const found =
+      findTranslationValue(
+        parsed
+      );
+
+    if (found) {
+
+      return found;
+
+    }
+
+  } catch {
+
+    // ไม่เป็น JSON ให้ตรวจเป็นข้อความต่อ
+
+  }
+
+
+  /*
+    ======================================================
+    ถ้าเป็น HTML error page
+    ไม่เอา HTML ไปแสดงเป็นคำแปล
+    ======================================================
+  */
+
+  const lower =
+    value.toLowerCase();
+
+  if (
+    lower.includes(
+      "<!doctype html"
+    ) ||
+    lower.includes(
+      "<html"
+    ) ||
+    lower.includes(
+      "<head"
+    )
+  ) {
+
+    return "";
+
+  }
+
+
+  /*
+    ======================================================
+    กรณี API ส่งข้อความแปลตรง ๆ
+    ======================================================
+  */
+
+  return value.trim();
+
+}
+
+
+/* =========================================================
+   FIND TRANSLATION VALUE
+   ========================================================= */
+
+function findTranslationValue(
+  data
+) {
+
+  if (
+    data === null ||
+    data === undefined
+  ) {
+
+    return "";
+
+  }
+
+
+  /*
+    ถ้าเป็น string
+    ถือว่าเป็นคำแปล
+  */
+
+  if (
+    typeof data ===
+      "string"
+  ) {
+
+    const value =
+      data.trim();
+
+    return value;
+
+  }
+
+
+  if (
+    typeof data !==
+      "object"
+  ) {
+
+    return "";
+
+  }
+
+
+  /*
+    รองรับชื่อ field หลายแบบ
+  */
+
+  const keys = [
+
+    "translation",
+    "translatedText",
+    "translated",
+    "result",
+    "output",
+    "text",
+    "answer",
+    "response",
+    "message"
+
+  ];
+
+
+  for (
+    const key
+    of keys
+  ) {
+
+    if (
+      data[key] !==
+      undefined &&
+      data[key] !==
+      null
+    ) {
+
+      const value =
+        data[key];
+
+      if (
+        typeof value ===
+          "string" &&
+        value.trim()
+      ) {
+
+        return value.trim();
+
+      }
+
+
+      if (
+        typeof value ===
+          "object"
+      ) {
+
+        const nested =
+          findTranslationValue(
+            value
+          );
+
+        if (nested) {
+
+          return nested;
+
+        }
+
+      }
+
+    }
+
+  }
+
+
+  /*
+    รองรับ
+    { data: {...} }
+    { data: "..." }
+  */
+
+  if (
+    data.data !==
+      undefined &&
+    data.data !==
+      null
+  ) {
+
+    const nested =
+      findTranslationValue(
+        data.data
+      );
+
+    if (nested) {
+
+      return nested;
+
+    }
+
+  }
+
+
+  /*
+    รองรับ
+    { result: { translation: "..." } }
+  */
+
+  if (
+    data.result &&
+    typeof data.result ===
+      "object"
+  ) {
+
+    const nested =
+      findTranslationValue(
+        data.result
+      );
+
+    if (nested) {
+
+      return nested;
+
+    }
+
+  }
+
+
+  return "";
 
 }
 
@@ -2482,108 +2793,6 @@ async function translateText() {
       false;
 
   }
-
-}
-
-
-/* =========================================================
-   EXTRACT TRANSLATION
-   ========================================================= */
-
-function extractTranslation(
-  data,
-  raw
-) {
-
-  if (data) {
-
-    const keys = [
-
-      "translation",
-      "translatedText",
-      "result",
-      "text",
-      "output",
-      "translated",
-      "data"
-
-    ];
-
-    for (
-      const key
-      of keys
-    ) {
-
-      const value =
-        data[key];
-
-      if (
-        typeof value ===
-          "string" &&
-        value.trim()
-      ) {
-
-        return value.trim();
-
-      }
-
-    }
-
-    if (
-      data.data &&
-      typeof data.data ===
-        "object"
-    ) {
-
-      for (
-        const key
-        of keys
-      ) {
-
-        const value =
-          data.data[key];
-
-        if (
-          typeof value ===
-            "string" &&
-          value.trim()
-        ) {
-
-          return value.trim();
-
-        }
-
-      }
-
-    }
-
-  }
-
-  if (
-    typeof raw ===
-      "string" &&
-    raw.trim()
-  ) {
-
-    const value =
-      raw.trim();
-
-    if (
-      !value.startsWith(
-        "<!DOCTYPE"
-      ) &&
-      !value.startsWith(
-        "<html"
-      )
-    ) {
-
-      return value;
-
-    }
-
-  }
-
-  return "";
 
 }
 
