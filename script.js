@@ -3,20 +3,22 @@
    Thai ↔ English
    OCR + Translation
 
-   VERSION 37
+   VERSION 38
 
    OCR:
    - Thai OCR + English OCR แยก Worker
-   - ไม่รวม noise จากทุก pass แบบเดิม
+   - ใช้หลาย pass เพื่อเพิ่มความแม่นยำ
    - ใช้ line confidence + word confidence
-   - ใช้ความบริสุทธิ์ของภาษา
-   - ใช้ความเสถียรของข้อความจากหลาย pass
-   - ใช้ตำแหน่งข้อความในการตรวจซ้ำ
-   - ลด Thai hallucination จาก English
-   - ลด English hallucination จาก Thai
-   - รองรับข้อความไทย + อังกฤษในภาพเดียวกัน
+   - ตรวจความบริสุทธิ์ของภาษา
+   - ตรวจความเสถียรจากหลาย pass
+   - ตรวจตำแหน่งข้อความ
+   - กรอง OCR noise ที่เป็นคำมั่ว
+   - กรอง English hallucination
+   - กรอง Thai hallucination
+   - ป้องกันข้อความซ้ำ
+   - รองรับไทย + อังกฤษในภาพเดียวกัน
    - Camera และ Gallery ใช้ระบบเดียวกัน
-   - ไม่ hardcode คำจากรูปตัวอย่าง
+   - ไม่ hardcode ข้อความจากรูปตัวอย่าง
 ========================================================= */
 
 
@@ -1581,24 +1583,6 @@ function getWordConfidence(
 
 
 /* =========================================================
-   WORD COUNT
-========================================================= */
-
-function countWords(
-  text
-) {
-
-  return String(
-    text || ""
-  )
-    .split(/\s+/)
-    .filter(Boolean)
-    .length;
-
-}
-
-
-/* =========================================================
    LINE QUALITY
 ========================================================= */
 
@@ -1717,11 +1701,6 @@ function getLineQuality(
   }
 
 
-  /*
-    Thai ที่มีรูปแบบตัวอักษรผิดปกติ
-    ลดคะแนนเล็กน้อย แต่ไม่ตัดทิ้งทันที
-  */
-
   if (
     expectedLanguage === "th" &&
     thai >= 4
@@ -1736,22 +1715,17 @@ function getLineQuality(
 
 
     if (
-      markRatio < 0.04 &&
-      thai >= 8
+      markRatio < 0.08 &&
+      thai >= 10
     ) {
 
       score -=
-        8;
+        12;
 
     }
 
   }
 
-
-  /*
-    บรรทัดที่มีตัวเลขแทรกกลางคำมาก
-    มักเป็น OCR noise
-  */
 
   if (
     digits > 0 &&
@@ -1834,199 +1808,726 @@ function normalizeEnglishText(
 
 
 /* =========================================================
-   EXTRACT OCR LINES
+   ENGLISH GIBBERISH FILTER
 ========================================================= */
 
-function extractOCRLines(
-  data,
-  language,
-  passIndex = 0
+function looksLikeEnglishGibberish(
+  text
 ) {
 
-  const result = [];
+  const value =
+    normalizeEnglishText(
+      text
+    );
+
+
+  if (!value)
+    return true;
+
+
+  const letters =
+    (
+      value.match(
+        /[a-zA-Z]/g
+      ) || []
+    ).length;
 
 
   if (
-    !data ||
-    !Array.isArray(
-      data.lines
+    letters < 4
+  ) {
+
+    return false;
+
+  }
+
+
+  const words =
+    value
+      .split(/\s+/)
+      .filter(Boolean);
+
+
+  /*
+    OCR มั่วจากภาพมักกลายเป็น
+    ตัวอักษรยาวติดกันโดยไม่มีช่องว่าง
+    เช่น
+    waldluuAigsnranndniudu
+    wslsaunduneiasiiae
+  */
+
+  if (
+    words.length === 1 &&
+    letters >= 11
+  ) {
+
+    const word =
+      words[0]
+        .replace(
+          /[^a-zA-Z]/g,
+          ""
+        );
+
+
+    const vowels =
+      (
+        word.match(
+          /[aeiouy]/gi
+        ) || []
+      ).length;
+
+
+    const unique =
+      new Set(
+        word.toLowerCase()
+          .split("")
+      ).size;
+
+
+    /*
+      ถ้าเป็นคำเดี่ยวยาวมาก
+      และมีรูปแบบตัวอักษรผิดปกติ
+      ให้ตัดเป็น OCR noise
+    */
+
+    if (
+      vowels === 0
+    ) {
+
+      return true;
+
+    }
+
+
+    if (
+      letters >= 15 &&
+      vowels / letters < 0.22
+    ) {
+
+      return true;
+
+    }
+
+
+    if (
+      letters >= 16 &&
+      unique <= 7
+    ) {
+
+      return true;
+
+    }
+
+
+    /*
+      คำเดี่ยวยาวมากกว่า 18 ตัว
+      ไม่ใช่รูปแบบที่ OCR ควรเก็บไว้
+      เว้นแต่จะมี punctuation ชัดเจน
+    */
+
+    if (
+      letters >= 19 &&
+      !/[.,!?'"’‘:-]/.test(value)
+    ) {
+
+      return true;
+
+    }
+
+  }
+
+
+  /*
+    ตัวอักษรซ้ำผิดธรรมชาติ
+  */
+
+  if (
+    /(.)\1{4,}/i.test(
+      value
     )
   ) {
 
-    return result;
+    return true;
 
   }
+
+
+  return false;
+
+}
+
+
+/* =========================================================
+   THAI GIBBERISH FILTER
+========================================================= */
+
+function looksLikeThaiGibberish(
+  text
+) {
+
+  const value =
+    normalizeThaiText(
+      text
+    );
+
+
+  if (!value)
+    return true;
+
+
+  const thai =
+    countThai(
+      value
+    );
+
+
+  if (
+    thai < 5
+  ) {
+
+    return false;
+
+  }
+
+
+  const marks =
+    countThaiMarks(
+      value
+    );
+
+
+  const markRatio =
+    marks /
+    Math.max(
+      1,
+      thai
+    );
+
+
+  /*
+    ไทยจริงที่เป็นประโยคมักมีสระ/วรรณยุกต์
+    แต่ OCR noise มักเป็นพยัญชนะติดกัน
+  */
+
+  if (
+    thai >= 12 &&
+    markRatio < 0.07
+  ) {
+
+    return true;
+
+  }
+
+
+  /*
+    ตรวจตัวเลขแทรกในข้อความไทย
+  */
+
+  const digits =
+    countDigits(
+      value
+    );
+
+
+  if (
+    digits >= 3 &&
+    digits >= thai * 0.35
+  ) {
+
+    return true;
+
+  }
+
+
+  return false;
+
+}
+
+
+/* =========================================================
+   OCR NOISE
+========================================================= */
+
+function looksLikeOCRNoise(
+  line
+) {
+
+  const text =
+    cleanText(
+      line
+    );
+
+
+  if (!text)
+    return true;
+
+
+  const thai =
+    countThai(
+      text
+    );
+
+
+  const english =
+    countEnglish(
+      text
+    );
+
+
+  const digits =
+    countDigits(
+      text
+    );
+
+
+  const letters =
+    thai +
+    english;
+
+
+  if (!letters)
+    return true;
+
+
+  if (
+    digits >= 5 &&
+    digits > letters
+  ) {
+
+    return true;
+
+  }
+
+
+  const symbols =
+    (
+      text.match(
+        /[^ก-๙a-zA-Z0-9๐-๙\s.,!?'"’‘:;()\-]/g
+      ) || []
+    ).length;
+
+
+  if (
+    symbols >= 5 &&
+    symbols > letters * 0.6
+  ) {
+
+    return true;
+
+  }
+
+
+  const suspicious =
+    (
+      text.match(
+        /[|~`_^*=<>[\]{}]/g
+      ) || []
+    ).length;
+
+
+  if (
+    suspicious >= 2 &&
+    suspicious >=
+      Math.max(
+        2,
+        Math.floor(
+          letters * 0.15
+        )
+      )
+  ) {
+
+    return true;
+
+  }
+
+
+  if (
+    english > 0 &&
+    thai === 0
+  ) {
+
+    const words =
+      text
+        .split(/\s+/)
+        .filter(Boolean);
+
+
+    if (
+      words.length === 1 &&
+      english <= 2
+    ) {
+
+      return true;
+
+    }
+
+
+    if (
+      looksLikeEnglishGibberish(
+        text
+      )
+    ) {
+
+      return true;
+
+    }
+
+  }
+
+
+  if (
+    thai > 0 &&
+    english === 0
+  ) {
+
+    if (
+      looksLikeThaiGibberish(
+        text
+      )
+    ) {
+
+      return true;
+
+    }
+
+  }
+
+
+  return false;
+
+}
+
+
+/* =========================================================
+   LANGUAGE-SPECIFIC NOISE
+========================================================= */
+
+function looksLikeLanguageNoise(
+  line,
+  language
+) {
+
+  if (
+    !line ||
+    !line.text
+  ) {
+
+    return true;
+
+  }
+
+
+  const text =
+    cleanText(
+      line.text
+    );
+
+
+  if (
+    looksLikeOCRNoise(
+      text
+    )
+  ) {
+
+    return true;
+
+  }
+
+
+  const thai =
+    countThai(
+      text
+    );
+
+
+  const english =
+    countEnglish(
+      text
+    );
+
+
+  const digits =
+    countDigits(
+      text
+    );
+
+
+  const confidence =
+    Number(
+      line.confidence || 0
+    );
+
+
+  const wordConfidence =
+    Number.isFinite(
+      Number(
+        line.wordConfidence
+      )
+    )
+      ? Number(
+          line.wordConfidence
+        )
+      : confidence;
+
+
+  const ratio =
+    getLanguageRatio(
+      text
+    );
+
+
+  if (
+    language === "th"
+  ) {
+
+    if (
+      thai === 0 &&
+      english > 0
+    ) {
+
+      return true;
+
+    }
+
+
+    if (
+      thai > 0 &&
+      ratio.thai < 0.55
+    ) {
+
+      return true;
+
+    }
+
+
+    if (
+      thai > 0 &&
+      confidence < 30 &&
+      wordConfidence < 38
+    ) {
+
+      return true;
+
+    }
+
+
+    if (
+      thai < 4 &&
+      english === 0 &&
+      text.replace(/\s/g, "").length >= 10 &&
+      confidence < 55 &&
+      wordConfidence < 55
+    ) {
+
+      return true;
+
+    }
+
+
+    if (
+      looksLikeThaiGibberish(
+        text
+      )
+    ) {
+
+      /*
+        ถ้า confidence สูงมาก
+        ยังเปิดโอกาสให้ข้อความจริงผ่านได้
+      */
+
+      if (
+        confidence < 78 ||
+        wordConfidence < 78
+      ) {
+
+        return true;
+
+      }
+
+    }
+
+  } else {
+
+    if (
+      english === 0 &&
+      thai > 0
+    ) {
+
+      return true;
+
+    }
+
+
+    if (
+      english > 0 &&
+      ratio.english < 0.55
+    ) {
+
+      return true;
+
+    }
+
+
+    if (
+      english > 0 &&
+      confidence < 30 &&
+      wordConfidence < 38
+    ) {
+
+      return true;
+
+    }
+
+
+    if (
+      looksLikeEnglishGibberish(
+        text
+      )
+    ) {
+
+      return true;
+
+    }
+
+  }
+
+
+  if (
+    digits >= 3 &&
+    digits >=
+      Math.max(
+        thai,
+        english
+      )
+  ) {
+
+    return true;
+
+  }
+
+
+  return false;
+
+}
+
+
+/* =========================================================
+   SAME TEXT
+========================================================= */
+
+function normalizeForCompare(
+  text
+) {
+
+  return String(
+    text || ""
+  )
+    .toLowerCase()
+    .replace(
+      /\s+/g,
+      " "
+    )
+    .trim();
+
+}
+
+
+function lineSimilarity(
+  a,
+  b
+) {
+
+  const x =
+    normalizeForCompare(
+      a
+    );
+
+
+  const y =
+    normalizeForCompare(
+      b
+    );
+
+
+  if (!x || !y)
+    return 0;
+
+
+  if (x === y)
+    return 1;
+
+
+  const xWords =
+    x.split(" ")
+      .filter(Boolean);
+
+
+  const yWords =
+    y.split(" ")
+      .filter(Boolean);
+
+
+  let same =
+    0;
 
 
   for (
-    const line
-    of data.lines
+    const word
+    of xWords
   ) {
 
-    const raw =
-      cleanText(
-        line.text
-      );
-
-
-    if (!raw)
-      continue;
-
-
-    const thai =
-      countThai(
-        raw
-      );
-
-
-    const english =
-      countEnglish(
-        raw
-      );
-
-
-    const digits =
-      countDigits(
-        raw
-      );
-
-
     if (
-      thai +
-      english ===
-      0
+      yWords.includes(
+        word
+      )
     ) {
 
-      continue;
+      same++;
 
     }
-
-
-    let text =
-      raw;
-
-
-    if (
-      language === "th"
-    ) {
-
-      text =
-        normalizeThaiText(
-          text
-        );
-
-    } else {
-
-      text =
-        normalizeEnglishText(
-          text
-        );
-
-    }
-
-
-    if (!text)
-      continue;
-
-
-    const bbox =
-      line.bbox || {};
-
-
-    const item = {
-
-      text,
-
-      language,
-
-      passIndex,
-
-      confidence:
-        Number(
-          line.confidence ||
-          data.confidence ||
-          0
-        ),
-
-      x:
-        Number(
-          bbox.x0 || 0
-        ),
-
-      y:
-        Number(
-          bbox.y0 || 0
-        ),
-
-      width:
-        Math.max(
-          1,
-          Number(
-            (bbox.x1 || 0) -
-            (bbox.x0 || 0)
-          )
-        ),
-
-      height:
-        Math.max(
-          1,
-          Number(
-            (bbox.y1 || 0) -
-            (bbox.y0 || 0)
-          )
-        ),
-
-      thai,
-
-      english,
-
-      digits,
-
-      wordConfidence:
-        getWordConfidence(
-          data,
-          {
-            x:
-              Number(
-                bbox.x0 || 0
-              ),
-
-            y:
-              Number(
-                bbox.y0 || 0
-              ),
-
-            width:
-              Math.max(
-                1,
-                Number(
-                  (bbox.x1 || 0) -
-                  (bbox.x0 || 0)
-                )
-              ),
-
-            height:
-              Math.max(
-                1,
-                Number(
-                  (bbox.y1 || 0) -
-                  (bbox.y0 || 0)
-                )
-              )
-          }
-        )
-
-    };
-
-
-    result.push(
-      item
-    );
 
   }
 
 
-  return result;
+  return (
+    same /
+    Math.max(
+      xWords.length,
+      yWords.length
+    )
+  );
+
+}
+
+
+function sameNormalizedText(
+  a,
+  b
+) {
+
+  const x =
+    normalizeForCompare(
+      a
+    );
+
+
+  const y =
+    normalizeForCompare(
+      b
+    );
+
+
+  if (!x || !y)
+    return false;
+
+
+  return (
+    x === y ||
+    lineSimilarity(
+      x,
+      y
+    ) >= 0.82
+  );
 
 }
 
@@ -2147,10 +2648,6 @@ function horizontalOverlapRatio(
 }
 
 
-/* =========================================================
-   LINE REGION RELATION
-========================================================= */
-
 function verticalCenter(
   line
 ) {
@@ -2258,7 +2755,7 @@ function sameTextRegion(
     );
 
 
-  if (
+  return (
     centerDistance <=
       referenceHeight * 0.55 &&
     gap <=
@@ -2266,463 +2763,6 @@ function sameTextRegion(
         20,
         referenceHeight * 1.15
       )
-  ) {
-
-    return true;
-
-  }
-
-
-  return false;
-
-}
-
-
-/* =========================================================
-   LINE SIMILARITY
-========================================================= */
-
-function normalizeForCompare(
-  text
-) {
-
-  return String(
-    text || ""
-  )
-    .toLowerCase()
-    .replace(
-      /\s+/g,
-      " "
-    )
-    .trim();
-
-}
-
-
-function lineSimilarity(
-  a,
-  b
-) {
-
-  const x =
-    normalizeForCompare(
-      a
-    );
-
-
-  const y =
-    normalizeForCompare(
-      b
-    );
-
-
-  if (!x || !y)
-    return 0;
-
-
-  if (x === y)
-    return 1;
-
-
-  const xWords =
-    x.split(" ")
-      .filter(Boolean);
-
-
-  const yWords =
-    y.split(" ")
-      .filter(Boolean);
-
-
-  let same =
-    0;
-
-
-  for (
-    const word
-    of xWords
-  ) {
-
-    if (
-      yWords.includes(
-        word
-      )
-    ) {
-
-      same++;
-
-    }
-
-  }
-
-
-  return (
-    same /
-    Math.max(
-      xWords.length,
-      yWords.length
-    )
-  );
-
-}
-
-
-/* =========================================================
-   OCR NOISE
-========================================================= */
-
-function looksLikeOCRNoise(
-  line
-) {
-
-  const text =
-    cleanText(
-      line
-    );
-
-
-  if (!text)
-    return true;
-
-
-  const thai =
-    countThai(
-      text
-    );
-
-
-  const english =
-    countEnglish(
-      text
-    );
-
-
-  const digits =
-    countDigits(
-      text
-    );
-
-
-  const letters =
-    thai +
-    english;
-
-
-  if (!letters)
-    return true;
-
-
-  if (
-    digits >= 5 &&
-    digits > letters
-  ) {
-
-    return true;
-
-  }
-
-
-  const symbols =
-    (
-      text.match(
-        /[^ก-๙a-zA-Z0-9๐-๙\s.,!?'"’‘:;()\-]/g
-      ) || []
-    ).length;
-
-
-  if (
-    symbols >= 5 &&
-    symbols > letters * 0.6
-  ) {
-
-    return true;
-
-  }
-
-
-  if (
-    english > 0 &&
-    thai === 0
-  ) {
-
-    const words =
-      text
-        .split(/\s+/)
-        .filter(Boolean);
-
-
-    if (
-      words.length === 1 &&
-      english <= 2
-    ) {
-
-      return true;
-
-    }
-
-  }
-
-
-  const suspicious =
-    (
-      text.match(
-        /[|~`_^*=<>[\]{}]/g
-      ) || []
-    ).length;
-
-
-  if (
-    suspicious >= 2 &&
-    suspicious >=
-      Math.max(
-        2,
-        Math.floor(
-          letters * 0.15
-        )
-      )
-  ) {
-
-    return true;
-
-  }
-
-
-  return false;
-
-}
-
-
-/* =========================================================
-   LANGUAGE-SPECIFIC NOISE
-========================================================= */
-
-function looksLikeLanguageNoise(
-  line,
-  language
-) {
-
-  if (
-    !line ||
-    !line.text
-  ) {
-
-    return true;
-
-  }
-
-
-  const text =
-    cleanText(
-      line.text
-    );
-
-
-  if (
-    looksLikeOCRNoise(
-      text
-    )
-  ) {
-
-    return true;
-
-  }
-
-
-  const thai =
-    countThai(
-      text
-    );
-
-
-  const english =
-    countEnglish(
-      text
-    );
-
-
-  const digits =
-    countDigits(
-      text
-    );
-
-
-  const confidence =
-    Number(
-      line.confidence || 0
-    );
-
-
-  const wordConfidence =
-    Number.isFinite(
-      Number(
-        line.wordConfidence
-      )
-    )
-      ? Number(
-          line.wordConfidence
-        )
-      : confidence;
-
-
-  const ratio =
-    getLanguageRatio(
-      text
-    );
-
-
-  if (
-    language === "th"
-  ) {
-
-    /*
-      Thai Worker ต้องมีภาษาไทยเป็นหลัก
-    */
-
-    if (
-      thai === 0 &&
-      english > 0
-    ) {
-
-      return true;
-
-    }
-
-
-    if (
-      thai > 0 &&
-      ratio.thai < 0.55
-    ) {
-
-      return true;
-
-    }
-
-
-    /*
-      ผลไทยที่ confidence ต่ำมาก
-    */
-
-    if (
-      thai > 0 &&
-      confidence < 30 &&
-      wordConfidence < 38
-    ) {
-
-      return true;
-
-    }
-
-
-    /*
-      ถ้าเป็นบรรทัดยาว แต่มีไทยน้อยมาก
-      มีโอกาสเป็นการอ่านอังกฤษผิดเป็นไทย
-    */
-
-    if (
-      thai < 4 &&
-      english === 0 &&
-      text.replace(/\s/g, "").length >= 10 &&
-      confidence < 55 &&
-      wordConfidence < 55
-    ) {
-
-      return true;
-
-    }
-
-  } else {
-
-    /*
-      English Worker ต้องมีภาษาอังกฤษเป็นหลัก
-    */
-
-    if (
-      english === 0 &&
-      thai > 0
-    ) {
-
-      return true;
-
-    }
-
-
-    if (
-      english > 0 &&
-      ratio.english < 0.55
-    ) {
-
-      return true;
-
-    }
-
-
-    if (
-      english > 0 &&
-      confidence < 30 &&
-      wordConfidence < 38
-    ) {
-
-      return true;
-
-    }
-
-  }
-
-
-  /*
-    ตัวเลขแทรกกลางข้อความจำนวนมาก
-  */
-
-  if (
-    digits >= 3 &&
-    digits >=
-      Math.max(
-        thai,
-        english
-      )
-  ) {
-
-    return true;
-
-  }
-
-
-  return false;
-
-}
-
-
-/* =========================================================
-   SAME TEXT
-========================================================= */
-
-function sameNormalizedText(
-  a,
-  b
-) {
-
-  const x =
-    normalizeForCompare(
-      a
-    );
-
-
-  const y =
-    normalizeForCompare(
-      b
-    );
-
-
-  if (!x || !y)
-    return false;
-
-
-  return (
-    x === y ||
-    lineSimilarity(
-      x,
-      y
-    ) >= 0.82
   );
 
 }
@@ -2772,8 +2812,7 @@ function getTextSupport(
       )
     ) {
 
-      support +=
-        1;
+      support++;
 
     }
 
@@ -2786,7 +2825,7 @@ function getTextSupport(
 
 
 /* =========================================================
-   BEST CANDIDATE FOR SAME REGION
+   BEST CANDIDATE
 ========================================================= */
 
 function chooseBetterLine(
@@ -2835,10 +2874,6 @@ function chooseBetterLine(
     );
 
 
-  /*
-    ความเสถียรข้าม pass มีน้ำหนักสูง
-  */
-
   if (
     supportA !==
     supportB
@@ -2851,11 +2886,6 @@ function chooseBetterLine(
 
   }
 
-
-  /*
-    ถ้ามี word confidence
-    ให้ใช้เป็นตัวตัดสินก่อน
-  */
 
   if (
     Number.isFinite(wordA) &&
@@ -2903,10 +2933,6 @@ function buildStableOCRLines(
 
   const groups = [];
 
-
-  /*
-    รวมข้อความเดียวกันที่ OCR เจอหลายรอบ
-  */
 
   for (
     const candidate
@@ -2998,26 +3024,18 @@ function buildStableOCRLines(
     }
 
 
-    best =
+    representatives.push(
       {
         ...best,
         support:
           group.length,
         candidates:
           group
-      };
-
-
-    representatives.push(
-      best
+      }
     );
 
   }
 
-
-  /*
-    เรียงตามความน่าเชื่อถือ
-  */
 
   representatives.sort(
     (
@@ -3075,9 +3093,14 @@ function buildStableOCRLines(
 
 
     for (
-      const old
-      of selected
+      let i = 0;
+      i < selected.length;
+      i++
     ) {
+
+      const old =
+        selected[i];
+
 
       if (
         !sameTextRegion(
@@ -3090,11 +3113,6 @@ function buildStableOCRLines(
 
       }
 
-
-      /*
-        ภาษาเดียวกัน
-        คือข้อความซ้ำบริเวณเดียวกัน
-      */
 
       if (
         old.language ===
@@ -3145,179 +3163,101 @@ function buildStableOCRLines(
 
         }
 
+
+        selected.splice(
+          i,
+          1
+        );
+
+        i--;
+
+        continue;
+
       }
 
 
       /*
-        คนละภาษา
-        ปกติข้อความไทยและอังกฤษสามารถอยู่ใกล้กันได้
-        จะตัดกันเฉพาะกรณีที่ดูเหมือนเป็นข้อความเดียวกันจริง ๆ
+        คนละภาษาอยู่ตำแหน่งเดียวกัน
+        ถ้าทั้งคู่มี support อย่างน้อย 2
+        เก็บไว้ทั้งคู่
+      */
+
+      const oldSupport =
+        Number(
+          old.support || 1
+        );
+
+
+      const newSupport =
+        Number(
+          candidate.support || 1
+        );
+
+
+      if (
+        oldSupport >= 2 &&
+        newSupport >= 2
+      ) {
+
+        continue;
+
+      }
+
+
+      const oldQuality =
+        getLineQuality(
+          old,
+          old.language
+        );
+
+
+      const newQuality =
+        getLineQuality(
+          candidate,
+          candidate.language
+        );
+
+
+      /*
+        ถ้าตัวเก่ามั่นคงกว่า
+        ตัด candidate
       */
 
       if (
-        old.language !==
-        candidate.language
+        oldSupport >=
+          newSupport + 1 &&
+        oldQuality >=
+          newQuality - 5
       ) {
 
-        const oldQuality =
-          getLineQuality(
-            old,
-            old.language
-          );
+        conflict =
+          true;
+
+        break;
+
+      }
 
 
-        const newQuality =
-          getLineQuality(
-            candidate,
-            candidate.language
-          );
+      /*
+        ถ้าตัวใหม่มั่นคงกว่า
+        เอาตัวเก่าออก
+      */
 
+      if (
+        newSupport >=
+          oldSupport + 1 &&
+        newQuality >=
+          oldQuality - 5
+      ) {
 
-        const oldSupport =
-          Number(
-            old.support || 1
-          );
+        selected.splice(
+          i,
+          1
+        );
 
+        i--;
 
-        const newSupport =
-          Number(
-            candidate.support || 1
-          );
-
-
-        const oldWord =
-          Number(
-            old.wordConfidence
-          );
-
-
-        const newWord =
-          Number(
-            candidate.wordConfidence
-          );
-
-
-        /*
-          ถ้าทั้งสองตัวเสถียร
-          ให้เก็บไว้ทั้งคู่ เพราะภาพอาจมีสองภาษา
-        */
-
-        const bothStable =
-          oldSupport >= 2 &&
-          newSupport >= 2;
-
-
-        if (
-          bothStable
-        ) {
-
-          continue;
-
-        }
-
-
-        /*
-          ถ้าตัวหนึ่งเสถียรหลาย pass
-          แต่อีกตัวเจอเพียงครั้งเดียว
-          ให้เชื่อผลที่เสถียรกว่า
-        */
-
-        if (
-          oldSupport >=
-            newSupport + 1 &&
-          oldQuality >=
-            newQuality - 5
-        ) {
-
-          conflict =
-            true;
-
-          break;
-
-        }
-
-
-        if (
-          newSupport >=
-            oldSupport + 1 &&
-          newQuality >=
-            oldQuality - 5
-        ) {
-
-          /*
-            candidate ใหม่ดีกว่า
-            ลบ old ภายหลัง
-          */
-
-          const index =
-            selected.indexOf(
-              old
-            );
-
-
-          if (
-            index >= 0
-          ) {
-
-            selected.splice(
-              index,
-              1
-            );
-
-          }
-
-          continue;
-
-        }
-
-
-        /*
-          ถ้าความมั่นใจต่างกันมาก
-          ใช้ word confidence
-        */
-
-        if (
-          Number.isFinite(oldWord) &&
-          Number.isFinite(newWord) &&
-          Math.abs(
-            oldWord - newWord
-          ) >= 15
-        ) {
-
-          if (
-            oldWord >
-            newWord
-          ) {
-
-            conflict =
-              true;
-
-            break;
-
-          } else {
-
-            const index =
-              selected.indexOf(
-                old
-              );
-
-
-            if (
-              index >= 0
-            ) {
-
-              selected.splice(
-                index,
-                1
-              );
-
-            }
-
-            continue;
-
-          }
-
-        }
+        continue;
 
       }
 
@@ -3341,7 +3281,7 @@ function buildStableOCRLines(
 
 
 /* =========================================================
-   SORT
+   SORT OCR
 ========================================================= */
 
 function sortOCRLines(
@@ -3416,6 +3356,190 @@ function sortOCRLines(
 
       }
     );
+
+}
+
+
+/* =========================================================
+   EXTRACT OCR LINES
+========================================================= */
+
+function extractOCRLines(
+  data,
+  language,
+  passIndex = 0
+) {
+
+  const result = [];
+
+
+  if (
+    !data ||
+    !Array.isArray(
+      data.lines
+    )
+  ) {
+
+    return result;
+
+  }
+
+
+  for (
+    const line
+    of data.lines
+  ) {
+
+    const raw =
+      cleanText(
+        line.text
+      );
+
+
+    if (!raw)
+      continue;
+
+
+    const thai =
+      countThai(
+        raw
+      );
+
+
+    const english =
+      countEnglish(
+        raw
+      );
+
+
+    const digits =
+      countDigits(
+        raw
+      );
+
+
+    if (
+      thai +
+      english ===
+      0
+    ) {
+
+      continue;
+
+    }
+
+
+    let text =
+      raw;
+
+
+    if (
+      language === "th"
+    ) {
+
+      text =
+        normalizeThaiText(
+          text
+        );
+
+    } else {
+
+      text =
+        normalizeEnglishText(
+          text
+        );
+
+    }
+
+
+    if (!text)
+      continue;
+
+
+    const bbox =
+      line.bbox || {};
+
+
+    const x =
+      Number(
+        bbox.x0 || 0
+      );
+
+
+    const y =
+      Number(
+        bbox.y0 || 0
+      );
+
+
+    const width =
+      Math.max(
+        1,
+        Number(
+          (bbox.x1 || 0) -
+          (bbox.x0 || 0)
+        )
+      );
+
+
+    const height =
+      Math.max(
+        1,
+        Number(
+          (bbox.y1 || 0) -
+          (bbox.y0 || 0)
+        )
+      );
+
+
+    result.push(
+      {
+
+        text,
+
+        language,
+
+        passIndex,
+
+        confidence:
+          Number(
+            line.confidence ||
+            data.confidence ||
+            0
+          ),
+
+        x,
+
+        y,
+
+        width,
+
+        height,
+
+        thai,
+
+        english,
+
+        digits,
+
+        wordConfidence:
+          getWordConfidence(
+            data,
+            {
+              x,
+              y,
+              width,
+              height
+            }
+          )
+
+      }
+    );
+
+  }
+
+
+  return result;
 
 }
 
@@ -3558,11 +3682,6 @@ function buildFinalOCRTextFromCandidates(
     }
 
 
-    /*
-      ถ้าเป็น candidate ที่เจอเพียงครั้งเดียว
-      และ confidence ต่ำมาก ให้ตัดออก
-    */
-
     const support =
       Number(
         line.support || 1
@@ -3576,12 +3695,69 @@ function buildFinalOCRTextFromCandidates(
       );
 
 
+    /*
+      ถ้าเจอเพียงครั้งเดียว
+      ต้องมีคุณภาพค่อนข้างสูง
+    */
+
     if (
       support === 1 &&
-      quality < 48
+      quality < 52
     ) {
 
       continue;
+
+    }
+
+
+    /*
+      ถ้าเป็น English คำเดี่ยวยาว ๆ
+      ให้ตรวจซ้ำอีกครั้ง
+    */
+
+    if (
+      line.language === "en" &&
+      looksLikeEnglishGibberish(
+        text
+      )
+    ) {
+
+      continue;
+
+    }
+
+
+    /*
+      ถ้าเป็น Thai noise
+      ให้ตัดเมื่อ confidence ไม่สูงพอ
+    */
+
+    if (
+      line.language === "th" &&
+      looksLikeThaiGibberish(
+        text
+      )
+    ) {
+
+      const wordConfidence =
+        Number(
+          line.wordConfidence
+        );
+
+
+      if (
+        quality < 78 &&
+        (
+          !Number.isFinite(
+            wordConfidence
+          ) ||
+          wordConfidence < 78
+        )
+      ) {
+
+        continue;
+
+      }
 
     }
 
@@ -3632,7 +3808,7 @@ function buildFinalOCRTextFromCandidates(
 
 
 /* =========================================================
-   OCR MAIN
+   OCR ON CANVAS
 ========================================================= */
 
 async function runOCROnCanvas(
@@ -3672,7 +3848,7 @@ async function runOCROnCanvas(
 
 
 /* =========================================================
-   OCR
+   OCR MAIN
 ========================================================= */
 
 async function runOCR(
@@ -3726,7 +3902,6 @@ async function runOCR(
 
     /* =====================================================
        PASS 1
-       ภาพปกติ + PSM 6
     ===================================================== */
 
     showLoading(
@@ -3755,12 +3930,6 @@ async function runOCR(
     candidateResults.push(
       pass1
     );
-
-
-    /*
-      ถ้าผลมีข้อความแล้ว
-      ยังตรวจอีก pass เพื่อดูความเสถียร
-    */
 
 
     /* =====================================================
@@ -3841,7 +4010,7 @@ async function runOCR(
 
     /* =====================================================
        PASS 4
-       ใช้เฉพาะกรณีอ่านแทบไม่ได้
+       เฉพาะกรณีอ่านแทบไม่ได้
     ===================================================== */
 
     if (
@@ -4018,6 +4187,57 @@ function cleanFinalOCR(
     }
 
 
+    if (
+      looksLikeEnglishGibberish(
+        line
+      )
+    ) {
+
+      continue;
+
+    }
+
+
+    if (
+      looksLikeThaiGibberish(
+        line
+      )
+    ) {
+
+      /*
+        Final stage เข้มขึ้น
+        เพราะข้อความจริงที่ผ่านก่อนหน้านี้
+        ควรมี confidence รองรับแล้ว
+      */
+
+      const thai =
+        countThai(
+          line
+        );
+
+
+      const marks =
+        countThaiMarks(
+          line
+        );
+
+
+      if (
+        thai >= 12 &&
+        marks /
+          Math.max(
+            1,
+            thai
+          ) < 0.07
+      ) {
+
+        continue;
+
+      }
+
+    }
+
+
     const normalized =
       normalizeForCompare(
         line
@@ -4031,6 +4251,25 @@ function cleanFinalOCR(
             old
           ) ===
           normalized
+      )
+    ) {
+
+      continue;
+
+    }
+
+
+    /*
+      ป้องกันข้อความซ้ำที่มีเครื่องหมายต่างกัน
+    */
+
+    if (
+      result.some(
+        old =>
+          lineSimilarity(
+            old,
+            line
+          ) >= 0.9
       )
     ) {
 
@@ -5107,5 +5346,5 @@ window.addEventListener(
 
 
 /* =========================================================
-   VERSION 37 END
+   VERSION 38 END
 ========================================================= */
