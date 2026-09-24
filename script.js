@@ -3,34 +3,15 @@
    Thai ↔ English
    OCR + Translation
 
-   VERSION 29
+   VERSION 30
 
-   จุดแก้หลัก:
-   - ใช้ภาพต้นฉบับเป็นหลัก
-   - ไม่ใช้ sharpen
-   - ไม่ใช้ contrast
-   - PSM 11 สำหรับข้อความหลายตำแหน่ง
-   - PSM 6 เป็น fallback
-   - กรอง noise ระดับ word
-   - กรองบรรทัด OCR ที่ผิดธรรมชาติ
-   - กรองคำอังกฤษยาวติดกันแบบ noise
-   - กรองตัวอักษรอังกฤษสลับพิมพ์ใหญ่/เล็กผิดธรรมชาติ
-   - กรองบรรทัดไทยที่มีตัวเลข/สัญลักษณ์ผิดปกติ
-   - ใช้ symbol/bbox ช่วยประกอบภาษาไทย
-   - แก้กรณี Tesseract แยกภาษาไทยเป็นตัว ๆ
-   - กรอง unknown และ English noise
+   IMPORTANT:
+   - ยึดระบบ OCR ของ Version 28
+   - ไม่ใช้ระบบตัด Thai OCR ตามตำแหน่ง
+   - ไม่ใช้ removeOverlappingThaiOCR
+   - ไม่ให้ English OCR ที่อ่านไทยผิดมาทำลาย Thai OCR
+   - แยกภาษาต้นทางเฉพาะตอนกดแปล
    - รองรับ Camera + Gallery
-   - ไม่ hardcode รูปตัวอย่าง
-
-   VERSION 28:
-   - ตรวจตำแหน่งบรรทัดไทยกับอังกฤษ
-   - ตัด Thai OCR ที่อ่านภาษาอังกฤษซ้ำในตำแหน่งเดียวกัน
-
-   VERSION 29:
-   - แยกข้อความตามภาษาต้นทางก่อนส่งไปแปล
-   - ไทย → อังกฤษ ใช้เฉพาะภาษาไทยจาก OCR
-   - อังกฤษ → ไทย ใช้เฉพาะภาษาอังกฤษจาก OCR
-   - ไม่เอาภาษาปลายทางไปแปลซ้ำ
 ========================================================= */
 
 const API_URL =
@@ -264,7 +245,6 @@ function loadTesseract() {
 
         script.src =
           TESSERACT_URL;
-
 
         script.async =
           true;
@@ -1066,66 +1046,6 @@ function countDigits(
 
 
 /* =========================================================
-   WORD QUALITY
-========================================================= */
-
-function getWordQuality(
-  word
-) {
-
-  if (!word)
-    return {
-      confidence: 0,
-      useful: 0
-    };
-
-
-  const text =
-    cleanText(
-      word.text || ""
-    );
-
-
-  const confidence =
-    Number(
-      word.confidence || 0
-    );
-
-
-  const thai =
-    countThai(
-      text
-    );
-
-
-  const english =
-    countEnglish(
-      text
-    );
-
-
-  const digits =
-    countDigits(
-      text
-    );
-
-
-  return {
-
-    confidence,
-    thai,
-    english,
-    digits,
-    useful:
-      thai +
-      english
-
-  };
-
-}
-
-
-/* =========================================================
    ENGLISH WORD QUALITY
 ========================================================= */
 
@@ -1656,22 +1576,6 @@ function rebuildThaiFromSymbols(
       );
 
 
-    const english =
-      countEnglish(
-        text
-      );
-
-
-    if (
-      thai === 0 &&
-      english === 0
-    ) {
-
-      continue;
-
-    }
-
-
     if (
       thai > 0
     ) {
@@ -1683,22 +1587,6 @@ function rebuildThaiFromSymbols(
         x:
           Number(
             symbol?.bbox?.x0 || 0
-          ),
-
-        y:
-          Number(
-            symbol?.bbox?.y0 || 0
-          ),
-
-        width:
-          Math.max(
-            1,
-            Number(
-              symbol?.bbox?.x1 || 0
-            ) -
-            Number(
-              symbol?.bbox?.x0 || 0
-            )
           ),
 
         confidence:
@@ -1728,7 +1616,8 @@ function rebuildThaiFromSymbols(
   );
 
 
-  let result = "";
+  let result =
+    "";
 
 
   for (
@@ -2347,16 +2236,6 @@ function extractLines(
         Number(
           (bbox.y1 || 0) -
           (bbox.y0 || 0)
-        ),
-
-      x1:
-        Number(
-          bbox.x1 || 0
-        ),
-
-      y1:
-        Number(
-          bbox.y1 || 0
         )
 
     });
@@ -2543,461 +2422,7 @@ function deduplicateLines(
 
 
 /* =========================================================
-   GEOMETRY HELPERS
-========================================================= */
-
-function getLineRight(
-  line
-) {
-
-  const x =
-    Number(
-      line.x || 0
-    );
-
-
-  const width =
-    Number(
-      line.width || 0
-    );
-
-
-  if (
-    Number.isFinite(
-      line.x1
-    ) &&
-    Number(line.x1) > x
-  ) {
-
-    return Number(
-      line.x1
-    );
-
-  }
-
-
-  return x + width;
-
-}
-
-
-function getLineBottom(
-  line
-) {
-
-  const y =
-    Number(
-      line.y || 0
-    );
-
-
-  const height =
-    Number(
-      line.height || 0
-    );
-
-
-  if (
-    Number.isFinite(
-      line.y1
-    ) &&
-    Number(line.y1) > y
-  ) {
-
-    return Number(
-      line.y1
-    );
-
-  }
-
-
-  return y + height;
-
-}
-
-
-/* =========================================================
-   CHECK OVERLAPPING LINES
-========================================================= */
-
-function linesOccupySameArea(
-  lineA,
-  lineB
-) {
-
-  if (
-    !lineA ||
-    !lineB
-  ) {
-
-    return false;
-
-  }
-
-
-  const ax0 =
-    Number(
-      lineA.x || 0
-    );
-
-
-  const ay0 =
-    Number(
-      lineA.y || 0
-    );
-
-
-  const ax1 =
-    getLineRight(
-      lineA
-    );
-
-
-  const ay1 =
-    getLineBottom(
-      lineA
-    );
-
-
-  const bx0 =
-    Number(
-      lineB.x || 0
-    );
-
-
-  const by0 =
-    Number(
-      lineB.y || 0
-    );
-
-
-  const bx1 =
-    getLineRight(
-      lineB
-    );
-
-
-  const by1 =
-    getLineBottom(
-      lineB
-    );
-
-
-  const aWidth =
-    Math.max(
-      1,
-      ax1 - ax0
-    );
-
-
-  const aHeight =
-    Math.max(
-      1,
-      ay1 - ay0
-    );
-
-
-  const bWidth =
-    Math.max(
-      1,
-      bx1 - bx0
-    );
-
-
-  const bHeight =
-    Math.max(
-      1,
-      by1 - by0
-    );
-
-
-  const horizontalOverlap =
-    Math.max(
-      0,
-      Math.min(
-        ax1,
-        bx1
-      ) -
-      Math.max(
-        ax0,
-        bx0
-      )
-    );
-
-
-  const verticalOverlap =
-    Math.max(
-      0,
-      Math.min(
-        ay1,
-        by1
-      ) -
-      Math.max(
-        ay0,
-        by0
-      )
-    );
-
-
-  const horizontalRatio =
-    horizontalOverlap /
-    Math.min(
-      aWidth,
-      bWidth
-    );
-
-
-  const verticalRatio =
-    verticalOverlap /
-    Math.min(
-      aHeight,
-      bHeight
-    );
-
-
-  if (
-    verticalRatio >= 0.50 &&
-    horizontalRatio >= 0.15
-  ) {
-
-    return true;
-
-  }
-
-
-  const centerAY =
-    (ay0 + ay1) / 2;
-
-
-  const centerBY =
-    (by0 + by1) / 2;
-
-
-  const centerAX =
-    (ax0 + ax1) / 2;
-
-
-  const centerBX =
-    (bx0 + bx1) / 2;
-
-
-  const centerYDistance =
-    Math.abs(
-      centerAY -
-      centerBY
-    );
-
-
-  const centerXDistance =
-    Math.abs(
-      centerAX -
-      centerBX
-    );
-
-
-  const allowedY =
-    Math.max(
-      8,
-      Math.min(
-        aHeight,
-        bHeight
-      ) * 0.55
-    );
-
-
-  const allowedX =
-    Math.max(
-      20,
-      Math.min(
-        aWidth,
-        bWidth
-      ) * 0.85
-    );
-
-
-  if (
-    centerYDistance <= allowedY &&
-    centerXDistance <= allowedX
-  ) {
-
-    return true;
-
-  }
-
-
-  return false;
-
-}
-
-
-/* =========================================================
-   DETECT THAI OCR DUPLICATE OF ENGLISH
-========================================================= */
-
-function isThaiOCRDuplicateOfEnglish(
-  thaiLine,
-  englishLines
-) {
-
-  if (
-    !thaiLine ||
-    thaiLine.language !== "th"
-  ) {
-
-    return false;
-
-  }
-
-
-  if (
-    !Array.isArray(
-      englishLines
-    ) ||
-    englishLines.length === 0
-  ) {
-
-    return false;
-
-  }
-
-
-  const thaiText =
-    cleanText(
-      thaiLine.text
-    );
-
-
-  if (!thaiText)
-    return false;
-
-
-  const thaiCount =
-    countThai(
-      thaiText
-    );
-
-
-  const englishCount =
-    countEnglish(
-      thaiText
-    );
-
-
-  if (
-    thaiCount < 3
-  ) {
-
-    return false;
-
-  }
-
-
-  if (
-    englishCount >
-    thaiCount * 0.35
-  ) {
-
-    return false;
-
-  }
-
-
-  for (
-    const englishLine
-    of englishLines
-  ) {
-
-    if (
-      linesOccupySameArea(
-        thaiLine,
-        englishLine
-      )
-    ) {
-
-      return true;
-
-    }
-
-  }
-
-
-  return false;
-
-}
-
-
-/* =========================================================
-   REMOVE OVERLAPPING THAI OCR
-========================================================= */
-
-function removeOverlappingThaiOCR(
-  thaiLines,
-  englishLines
-) {
-
-  if (
-    !Array.isArray(
-      thaiLines
-    )
-  ) {
-
-    return [];
-
-  }
-
-
-  if (
-    !Array.isArray(
-      englishLines
-    ) ||
-    englishLines.length === 0
-  ) {
-
-    return thaiLines;
-
-  }
-
-
-  const filtered = [];
-
-
-  for (
-    const thaiLine
-    of thaiLines
-  ) {
-
-    if (
-      isThaiOCRDuplicateOfEnglish(
-        thaiLine,
-        englishLines
-      )
-    ) {
-
-      console.log(
-        "ตัด Thai OCR duplicate:",
-        thaiLine.text
-      );
-
-
-      continue;
-
-    }
-
-
-    filtered.push(
-      thaiLine
-    );
-
-  }
-
-
-  return filtered;
-
-}
-
-
-/* =========================================================
-   FINAL ENGLISH NOISE DETECTOR
+   FINAL ENGLISH NOISE
 ========================================================= */
 
 function isEnglishNoiseLine(
@@ -3195,7 +2620,7 @@ function isEnglishNoiseLine(
 
 
 /* =========================================================
-   FINAL THAI NOISE DETECTOR
+   FINAL THAI NOISE
 ========================================================= */
 
 function isThaiNoiseLine(
@@ -3382,7 +2807,7 @@ function isFinalOCRNoise(
 
 
 /* =========================================================
-   NORMALIZE THAI TEXT
+   NORMALIZE THAI
 ========================================================= */
 
 function normalizeThaiText(
@@ -3440,7 +2865,7 @@ function normalizeThaiText(
 
 
 /* =========================================================
-   MERGE LINES
+   MERGE OCR LINES
 ========================================================= */
 
 function mergeLines(
@@ -3448,12 +2873,11 @@ function mergeLines(
   englishLines
 ) {
 
-  thaiLines =
-    removeOverlappingThaiOCR(
-      thaiLines,
-      englishLines
-    );
-
+  /*
+    สำคัญ:
+    ไม่มีการลบ Thai OCR ตามตำแหน่ง
+    เพราะ Version 29 ทำให้กล้องอ่านไทยหาย
+  */
 
   const all = [
 
@@ -3727,6 +3151,11 @@ async function runOCR(
       );
 
 
+    /*
+      PASS 1
+      อ่านไทยและอังกฤษแยก worker
+    */
+
     showLoading(
       "กำลังอ่านข้อความภาษาไทย..."
     );
@@ -3766,6 +3195,11 @@ async function runOCR(
         "en"
       );
 
+
+    /*
+      PASS 2
+      ใช้ PSM 6 เฉพาะเมื่อไม่พบภาษา
+    */
 
     if (
       thaiLines.length === 0
@@ -4032,27 +3466,8 @@ if (speakOcrButton) {
 
 
 /* =========================================================
-   NEW VERSION 29
-   PREPARE TEXT FOR TRANSLATION
+   TRANSLATION SOURCE FILTER
 ========================================================= */
-
-/*
-  OCR ของรูปอาจมีทั้ง 2 ภาษา เช่น
-
-  It's only you
-  คุณคนเดียวเท่านั้น
-  who can save you.
-  ที่จะช่วยเหลือตัวคุณเองได้
-
-  ถ้าแปลจากไทย → อังกฤษ
-  ต้องส่งเฉพาะ:
-
-  คุณคนเดียวเท่านั้น
-  ที่จะช่วยเหลือตัวคุณเองได้
-
-  ไม่ควรส่งภาษาอังกฤษที่อยู่ในรูปไปแปลซ้ำ
-*/
-
 
 function extractSourceLanguageText(
   text,
@@ -4108,20 +3523,9 @@ function extractSourceLanguageText(
       );
 
 
-    const digits =
-      countDigits(
-        line
-      );
-
-
     if (
       language === "th"
     ) {
-
-      /*
-        ต้องมีภาษาไทยมากกว่าภาษาอังกฤษ
-        จึงถือว่าเป็นข้อความภาษาไทย
-      */
 
       if (
         thai > 0 &&
@@ -4129,31 +3533,16 @@ function extractSourceLanguageText(
       ) {
 
         let value =
-          line;
-
-
-        value =
           normalizeThaiText(
-            value
+            line
           );
 
 
-        /*
-          ถ้ามีตัวเลข/อักขระแปลก ๆ
-          แต่ยังเป็นไทย ให้ตัดเฉพาะตัวเลขออก
-        */
-
-        if (
-          digits > 0
-        ) {
-
-          value =
-            value.replace(
-              /[0-9๐-๙]/g,
-              ""
-            );
-
-        }
+        value =
+          value.replace(
+            /[0-9๐-๙]/g,
+            ""
+          );
 
 
         value =
@@ -4171,11 +3560,6 @@ function extractSourceLanguageText(
       }
 
     } else {
-
-      /*
-        English source
-        ต้องมีภาษาอังกฤษมากกว่าภาษาไทย
-      */
 
       if (
         english > 0 &&
@@ -4211,12 +3595,6 @@ function extractSourceLanguageText(
 
   }
 
-
-  /*
-    ถ้าหา source language ไม่เจอ
-    ให้ fallback เป็นข้อความเดิม
-    เพื่อไม่ทำให้ระบบแปลพัง
-  */
 
   if (
     sourceLines.length === 0
@@ -4268,8 +3646,7 @@ function prepareTranslationText(
 
   /*
     ถ้ามีทั้งไทยและอังกฤษ
-    ถือว่าเป็นข้อความจาก OCR
-    และเลือกเฉพาะภาษาต้นทาง
+    ให้เลือกเฉพาะภาษาต้นทาง
   */
 
   if (
@@ -4284,11 +3661,6 @@ function prepareTranslationText(
 
   }
 
-
-  /*
-    ถ้ามีภาษาเดียว
-    ส่งไปแปลตามปกติ
-  */
 
   return value;
 
@@ -4333,11 +3705,6 @@ async function translateText() {
   }
 
 
-  /*
-    VERSION 29
-    แยกภาษาต้นทางออกจาก OCR
-  */
-
   const text =
     prepareTranslationText(
       originalText
@@ -4357,9 +3724,8 @@ async function translateText() {
 
 
   /*
-    ถ้ามีการกรองภาษาออก
-    แสดงเฉพาะข้อความต้นทางในช่อง input
-    เพื่อให้ผู้ใช้เห็นว่าระบบกำลังแปลอะไร
+    แสดงเฉพาะข้อความภาษาต้นทาง
+    เมื่อข้อความเดิมมาจาก OCR
   */
 
   if (
