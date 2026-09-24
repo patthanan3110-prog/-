@@ -5,7 +5,7 @@
 
    OCR:
    Tesseract.js
-   General OCR + OCR CORRECTION VERSION
+   GENERAL OCR + WIDE CROP VERSION
 ========================================= */
 
 
@@ -698,7 +698,11 @@ async function prepareOCRImage(
 
 
   /* =====================================
-     FOCUS CROP
+     WIDE FOCUS CROP
+
+     เดิมเริ่มที่ 25%
+     ปรับเป็น 8%
+     เพื่อไม่ตัดข้อความด้านบน
   ===================================== */
 
   if (
@@ -707,22 +711,22 @@ async function prepareOCRImage(
 
     let cropX =
       Math.round(
-        originalWidth * 0.06
+        originalWidth * 0.03
       );
 
     let cropY =
       Math.round(
-        originalHeight * 0.25
+        originalHeight * 0.08
       );
 
     let cropWidth =
       Math.round(
-        originalWidth * 0.88
+        originalWidth * 0.94
       );
 
     let cropHeight =
       Math.round(
-        originalHeight * 0.68
+        originalHeight * 0.87
       );
 
 
@@ -783,6 +787,8 @@ async function prepareOCRImage(
 
   /* =====================================
      LOWER CROP
+
+     ใช้สำหรับข้อความบริเวณกลาง-ล่าง
   ===================================== */
 
   if (
@@ -791,22 +797,22 @@ async function prepareOCRImage(
 
     const cropX =
       Math.round(
-        originalWidth * 0.05
+        originalWidth * 0.03
       );
 
     const cropY =
       Math.round(
-        originalHeight * 0.38
+        originalHeight * 0.25
       );
 
     const cropWidth =
       Math.round(
-        originalWidth * 0.90
+        originalWidth * 0.94
       );
 
     const cropHeight =
       Math.round(
-        originalHeight * 0.55
+        originalHeight * 0.70
       );
 
 
@@ -849,22 +855,22 @@ async function prepareOCRImage(
 
     const cropX =
       Math.round(
-        originalWidth * 0.10
+        originalWidth * 0.05
       );
 
     const cropY =
       Math.round(
-        originalHeight * 0.20
+        originalHeight * 0.10
       );
 
     const cropWidth =
       Math.round(
-        originalWidth * 0.80
+        originalWidth * 0.90
       );
 
     const cropHeight =
       Math.round(
-        originalHeight * 0.60
+        originalHeight * 0.75
       );
 
 
@@ -1450,10 +1456,6 @@ function cleanOCRText(text) {
     );
 
 
-  /* =====================================
-     NORMALIZE SPACE
-  ===================================== */
-
   cleaned =
     cleaned.replace(
       /[ \t]+/g,
@@ -1462,7 +1464,7 @@ function cleanOCRText(text) {
 
 
   /* =====================================
-     REMOVE GARBAGE SYMBOL-ONLY LINES
+     REMOVE SYMBOL-ONLY LINES
   ===================================== */
 
   cleaned =
@@ -1474,14 +1476,9 @@ function cleanOCRText(text) {
 
   /* =====================================
      COMMON THAI OCR CORRECTIONS
-     
-     แก้เฉพาะรูปแบบที่ OCR ผิดชัดเจน
-     ไม่ล็อกข้อความทั้งประโยค
   ===================================== */
 
   const corrections = [
-
-    /* ช่วยลด */
 
     {
       pattern:
@@ -1510,9 +1507,6 @@ function cleanOCRText(text) {
       replacement:
         "ช่วยลด"
     },
-
-
-    /* รีไซเคิล */
 
     {
       pattern:
@@ -1549,9 +1543,6 @@ function cleanOCRText(text) {
         "รีไซเคิลได้"
     },
 
-
-    /* พลาสติก */
-
     {
       pattern:
         /ผลาสติก/g,
@@ -1572,9 +1563,6 @@ function cleanOCRText(text) {
       replacement:
         "พลาสติก"
     },
-
-
-    /* รับประทาน */
 
     {
       pattern:
@@ -1646,7 +1634,7 @@ function cleanOCRText(text) {
 
 
   /* =====================================
-     ENGLISH OCR CORRECTION
+     ENGLISH OCR REPAIR
   ===================================== */
 
   cleaned =
@@ -1761,12 +1749,6 @@ function cleanOCRText(text) {
         }
 
 
-        /*
-         * ไม่ลบคำสั้นทั่วไป
-         * เพื่อให้รองรับ OCR ที่มีคำสั้น เช่น
-         * "ไป", "มา", "OK", "Hi"
-         */
-
         return true;
 
       }
@@ -1870,10 +1852,6 @@ function cleanOCRText(text) {
       lines[i + 1] || "";
 
 
-    /*
-     * Recommend + ed
-     */
-
     if (
       /^Recommend$/i.test(current) &&
       /^ed\b/i.test(next)
@@ -1891,10 +1869,6 @@ function cleanOCRText(text) {
     }
 
 
-    /*
-     * ed + for
-     */
-
     if (
       /^ed$/i.test(current) &&
       /^for\s+/i.test(next)
@@ -1911,10 +1885,6 @@ function cleanOCRText(text) {
 
     }
 
-
-    /*
-     * Recommended + for
-     */
 
     if (
       /^Recommended$/i.test(current) &&
@@ -1946,7 +1916,7 @@ function cleanOCRText(text) {
 
 
   /* =====================================
-     FINAL TEXT CLEANUP
+     FINAL CLEANUP
   ===================================== */
 
   cleaned =
@@ -2004,7 +1974,7 @@ function selectBestOCRResult(
 
 
   results.forEach(
-    function (result) {
+    function(result) {
 
       if (
         !result ||
@@ -2101,15 +2071,15 @@ async function runOCR(
 
     /* =====================================
        PASS 1
-       FOCUS CROP + PSM 6
+       WIDE FOCUS + PSM 6
     ===================================== */
 
     ocrText.value =
-      "กำลังอ่านข้อความจากบริเวณข้อความ...";
+      "กำลังอ่านข้อความจากภาพ...";
 
 
     showStatus(
-      "กำลังโฟกัสบริเวณข้อความ...",
+      "กำลังอ่านข้อความ...",
       "success"
     );
 
@@ -2125,7 +2095,7 @@ async function runOCR(
       await recognizeOCR(
         worker,
         focusImage,
-        "focus",
+        "wide-focus",
         6
       );
 
@@ -2137,7 +2107,7 @@ async function runOCR(
 
     /* =====================================
        PASS 2
-       FOCUS CROP + PSM 11
+       WIDE FOCUS + PSM 11
     ===================================== */
 
     ocrText.value =
@@ -2148,7 +2118,7 @@ async function runOCR(
       await recognizeOCR(
         worker,
         focusImage,
-        "focus-sparse",
+        "wide-focus-sparse",
         11
       );
 
@@ -2160,7 +2130,7 @@ async function runOCR(
 
     /* =====================================
        PASS 3
-       LOWER CROP + PSM 6
+       LOWER + PSM 6
     ===================================== */
 
     ocrText.value =
@@ -2190,7 +2160,7 @@ async function runOCR(
 
     /* =====================================
        PASS 4
-       LOWER CROP + PSM 11
+       LOWER + PSM 11
     ===================================== */
 
     const lowerSparseResult =
@@ -2209,7 +2179,7 @@ async function runOCR(
 
     /* =====================================
        PASS 5
-       CENTER CROP + PSM 6
+       CENTER + PSM 6
     ===================================== */
 
     ocrText.value =
@@ -2239,11 +2209,14 @@ async function runOCR(
 
     /* =====================================
        PASS 6
-       FULL IMAGE + PSM 11
+       FULL IMAGE + PSM 6
+
+       เพิ่มรอบนี้เพื่อไม่ให้บรรทัดบนสุด
+       หายไปจากการเลือกผล OCR
     ===================================== */
 
     ocrText.value =
-      "กำลังตรวจสอบภาพทั้งหมด...";
+      "กำลังอ่านข้อความจากภาพทั้งหมด...";
 
 
     const originalImage =
@@ -2253,17 +2226,40 @@ async function runOCR(
       );
 
 
-    const originalResult =
+    const originalDenseResult =
       await recognizeOCR(
         worker,
         originalImage,
-        "original",
+        "original-dense",
+        6
+      );
+
+
+    results.push(
+      originalDenseResult
+    );
+
+
+    /* =====================================
+       PASS 7
+       FULL IMAGE + PSM 11
+    ===================================== */
+
+    ocrText.value =
+      "กำลังตรวจสอบภาพทั้งหมด...";
+
+
+    const originalSparseResult =
+      await recognizeOCR(
+        worker,
+        originalImage,
+        "original-sparse",
         11
       );
 
 
     results.push(
-      originalResult
+      originalSparseResult
     );
 
 
@@ -2372,7 +2368,7 @@ async function runOCR(
 
 useOcrButton.addEventListener(
   "click",
-  function () {
+  function() {
 
     const text =
       ocrText.value.trim();
@@ -2428,7 +2424,7 @@ useOcrButton.addEventListener(
 
 clearInputButton.addEventListener(
   "click",
-  function () {
+  function() {
 
     inputText.value =
       "";
@@ -2461,7 +2457,7 @@ clearInputButton.addEventListener(
 
 translateButton.addEventListener(
   "click",
-  function () {
+  function() {
 
     translateText();
 
@@ -2638,7 +2634,7 @@ async function translateText() {
 
 speakResultButton.addEventListener(
   "click",
-  function () {
+  function() {
 
     const text =
       resultText.classList.contains("empty")
@@ -2674,7 +2670,7 @@ speakResultButton.addEventListener(
 
 speakOcrButton.addEventListener(
   "click",
-  function () {
+  function() {
 
     const text =
       ocrText.value.trim();
@@ -2754,7 +2750,7 @@ function speakText(
 
 
   utterance.onstart =
-    function () {
+    function() {
 
       showStatus(
         "กำลังออกเสียง...",
@@ -2765,7 +2761,7 @@ function speakText(
 
 
   utterance.onend =
-    function () {
+    function() {
 
       hideStatus();
 
@@ -2773,7 +2769,7 @@ function speakText(
 
 
   utterance.onerror =
-    function () {
+    function() {
 
       showStatus(
         "ไม่สามารถเล่นเสียงได้",
@@ -2796,7 +2792,7 @@ function speakText(
 
 copyResultButton.addEventListener(
   "click",
-  async function () {
+  async function() {
 
     const text =
       resultText.classList.contains("empty")
@@ -2933,7 +2929,7 @@ function showStatus(
 
   window.statusTimer =
     setTimeout(
-      function () {
+      function() {
 
         hideStatus();
 
@@ -2958,7 +2954,7 @@ function hideStatus() {
 
 inputText.addEventListener(
   "keydown",
-  function (event) {
+  function(event) {
 
     if (
       (event.ctrlKey ||
@@ -2989,5 +2985,5 @@ resultText.classList.add(
 
 
 console.log(
-  "🌐 ผู้ช่วยแปลภาษา + General OCR Correction พร้อมใช้งาน"
+  "🌐 ผู้ช่วยแปลภาษา + Wide General OCR พร้อมใช้งาน"
 );
