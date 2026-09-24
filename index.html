@@ -10,25 +10,19 @@
 
   <title>ผู้ช่วยแปลภาษา</title>
 
-  <!-- Google Font -->
   <link
     href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap"
     rel="stylesheet"
   >
 
-  <!-- CSS -->
   <link rel="stylesheet" href="style.css">
-
 </head>
 
 <body>
 
-  <!-- ==============================
-       APP
-  =============================== -->
   <main class="app">
 
-    <!-- Header -->
+    <!-- HEADER -->
     <header class="app-header">
 
       <div class="header-icon">
@@ -43,9 +37,7 @@
     </header>
 
 
-    <!-- ==============================
-         LANGUAGE SELECTOR
-    =============================== -->
+    <!-- LANGUAGE -->
     <section class="language-card">
 
       <div class="language-box">
@@ -91,9 +83,7 @@
     </section>
 
 
-    <!-- ==============================
-         INPUT AREA
-    =============================== -->
+    <!-- INPUT -->
     <section class="translation-card">
 
       <div class="card-title">
@@ -123,12 +113,9 @@
       ></textarea>
 
 
-      <!-- ==============================
-           IMAGE ACTIONS
-      =============================== -->
+      <!-- IMAGE ACTIONS -->
       <div class="image-actions">
 
-        <!-- Camera -->
         <button
           type="button"
           class="image-action camera-action"
@@ -154,7 +141,6 @@
         </button>
 
 
-        <!-- Gallery -->
         <button
           type="button"
           class="image-action gallery-action"
@@ -182,8 +168,7 @@
       </div>
 
 
-      <!-- Hidden image input -->
-
+      <!-- CAMERA INPUT -->
       <input
         type="file"
         id="cameraInput"
@@ -192,6 +177,8 @@
         hidden
       >
 
+
+      <!-- GALLERY INPUT -->
       <input
         type="file"
         id="galleryInput"
@@ -200,8 +187,7 @@
       >
 
 
-      <!-- Image preview -->
-
+      <!-- IMAGE PREVIEW -->
       <div
         id="imagePreviewContainer"
         class="image-preview-container"
@@ -234,8 +220,7 @@
       </div>
 
 
-      <!-- Translate button -->
-
+      <!-- TRANSLATE -->
       <button
         type="button"
         class="translate-button"
@@ -255,9 +240,7 @@
     </section>
 
 
-    <!-- ==============================
-         RESULT
-    =============================== -->
+    <!-- RESULT -->
     <section class="result-card">
 
       <div class="card-title">
@@ -303,8 +286,7 @@
       </div>
 
 
-      <!-- Result loading -->
-
+      <!-- LOADING -->
       <div
         id="loadingBox"
         class="loading-box"
@@ -322,9 +304,7 @@
     </section>
 
 
-    <!-- ==============================
-         OCR RESULT
-    =============================== -->
+    <!-- OCR RESULT -->
     <section
       id="ocrCard"
       class="ocr-card"
@@ -369,9 +349,7 @@
     </section>
 
 
-    <!-- ==============================
-         STATUS
-    =============================== -->
+    <!-- STATUS -->
     <div
       id="statusMessage"
       class="status-message"
@@ -379,8 +357,7 @@
     ></div>
 
 
-    <!-- Footer -->
-
+    <!-- FOOTER -->
     <footer class="app-footer">
 
       <span>
@@ -396,12 +373,8 @@
   </main>
 
 
-  <!-- ==============================
-       JAVASCRIPT
-       VERSION 20
-  =============================== -->
-
-  <script src="script.js?v=20260924-20"></script>
+  <!-- JAVASCRIPT VERSION 21 -->
+  <script src="script.js?v=20260924-21"></script>
 
 </body>
 </html>
