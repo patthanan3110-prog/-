@@ -5,18 +5,13 @@
 
    OCR:
    Tesseract.js
-   GENERAL OCR + WIDE CROP VERSION
+   GENERAL OCR
 
    UPDATE:
    - ปรับการเลือกผล OCR
-   - ตัดเครดิต OCR ขนาดเล็ก เช่น unknown -
+   - ตัดเครดิต OCR เช่น unknown -
    - ป้องกันข้อความซ้ำในผลแปล
    - แก้คำ OCR ภาษาไทยที่พบบ่อย
-========================================= */
-
-
-/* =========================================
-   CONFIG
 ========================================= */
 
 const API_URL =
@@ -31,7 +26,7 @@ let tesseractWorker = null;
 
 
 /* =========================================
-   LOAD TESSERACT.JS
+   LOAD TESSERACT
 ========================================= */
 
 function loadTesseract() {
@@ -84,12 +79,11 @@ function loadTesseract() {
     });
 
   return tesseractLoadingPromise;
-
 }
 
 
 /* =========================================
-   CREATE TESSERACT WORKER
+   TESSERACT WORKER
 ========================================= */
 
 async function getTesseractWorker() {
@@ -120,7 +114,8 @@ async function getTesseractWorker() {
 
               const progress =
                 Math.round(
-                  (message.progress || 0) * 100
+                  (message.progress || 0) *
+                  100
                 );
 
               ocrText.value =
@@ -158,86 +153,131 @@ async function getTesseractWorker() {
   tesseractReady = true;
 
   return tesseractWorker;
-
 }
 
 
 /* =========================================
-   ELEMENTS
+   DOM
 ========================================= */
 
 const inputText =
-  document.getElementById("inputText");
+  document.getElementById(
+    "inputText"
+  );
 
 const resultText =
-  document.getElementById("resultText");
+  document.getElementById(
+    "resultText"
+  );
 
 const ocrText =
-  document.getElementById("ocrText");
+  document.getElementById(
+    "ocrText"
+  );
 
 const ocrCard =
-  document.getElementById("ocrCard");
+  document.getElementById(
+    "ocrCard"
+  );
 
 const loadingBox =
-  document.getElementById("loadingBox");
+  document.getElementById(
+    "loadingBox"
+  );
 
 const loadingText =
-  document.getElementById("loadingText");
+  document.getElementById(
+    "loadingText"
+  );
 
 const statusMessage =
-  document.getElementById("statusMessage");
+  document.getElementById(
+    "statusMessage"
+  );
 
 const cameraInput =
-  document.getElementById("cameraInput");
+  document.getElementById(
+    "cameraInput"
+  );
 
 const galleryInput =
-  document.getElementById("galleryInput");
+  document.getElementById(
+    "galleryInput"
+  );
 
 const imagePreviewContainer =
-  document.getElementById("imagePreviewContainer");
+  document.getElementById(
+    "imagePreviewContainer"
+  );
 
 const imagePreview =
-  document.getElementById("imagePreview");
+  document.getElementById(
+    "imagePreview"
+  );
 
 const sourceLanguageText =
-  document.getElementById("sourceLanguageText");
+  document.getElementById(
+    "sourceLanguageText"
+  );
 
 const targetLanguageText =
-  document.getElementById("targetLanguageText");
+  document.getElementById(
+    "targetLanguageText"
+  );
 
 const translateButton =
-  document.getElementById("translateButton");
+  document.getElementById(
+    "translateButton"
+  );
 
 const swapLanguageButton =
-  document.getElementById("swapLanguageButton");
+  document.getElementById(
+    "swapLanguageButton"
+  );
 
 const cameraButton =
-  document.getElementById("cameraButton");
+  document.getElementById(
+    "cameraButton"
+  );
 
 const galleryButton =
-  document.getElementById("galleryButton");
+  document.getElementById(
+    "galleryButton"
+  );
 
 const clearInputButton =
-  document.getElementById("clearInputButton");
+  document.getElementById(
+    "clearInputButton"
+  );
 
 const removeImageButton =
-  document.getElementById("removeImageButton");
+  document.getElementById(
+    "removeImageButton"
+  );
 
 const copyResultButton =
-  document.getElementById("copyResultButton");
+  document.getElementById(
+    "copyResultButton"
+  );
 
 const speakResultButton =
-  document.getElementById("speakResultButton");
+  document.getElementById(
+    "speakResultButton"
+  );
 
 const speakOcrButton =
-  document.getElementById("speakOcrButton");
+  document.getElementById(
+    "speakOcrButton"
+  );
 
 const useOcrButton =
-  document.getElementById("useOcrButton");
+  document.getElementById(
+    "useOcrButton"
+  );
 
 
 /* =========================================
-   LANGUAGE UI
+   LANGUAGE
 ========================================= */
 
 function updateLanguageUI() {
@@ -253,13 +293,8 @@ function updateLanguageUI() {
       : "English";
 
   updatePlaceholder();
-
 }
 
-
-/* =========================================
-   PLACEHOLDER
-========================================= */
 
 function updatePlaceholder() {
 
@@ -270,10 +305,6 @@ function updatePlaceholder() {
 
 }
 
-
-/* =========================================
-   SWAP LANGUAGE
-========================================= */
 
 swapLanguageButton.addEventListener(
   "click",
@@ -294,7 +325,9 @@ swapLanguageButton.addEventListener(
       inputText.value.trim();
 
     const currentResult =
-      resultText.classList.contains("empty")
+      resultText.classList.contains(
+        "empty"
+      )
         ? ""
         : resultText.textContent.trim();
 
@@ -325,7 +358,7 @@ swapLanguageButton.addEventListener(
 
 
 /* =========================================
-   CAMERA
+   IMAGE INPUT
 ========================================= */
 
 cameraButton.addEventListener(
@@ -338,10 +371,6 @@ cameraButton.addEventListener(
 );
 
 
-/* =========================================
-   GALLERY
-========================================= */
-
 galleryButton.addEventListener(
   "click",
   function() {
@@ -352,10 +381,6 @@ galleryButton.addEventListener(
 );
 
 
-/* =========================================
-   CAMERA IMAGE
-========================================= */
-
 cameraInput.addEventListener(
   "change",
   function(event) {
@@ -363,19 +388,13 @@ cameraInput.addEventListener(
     const file =
       event.target.files[0];
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     handleSelectedImage(file);
 
   }
 );
 
-
-/* =========================================
-   GALLERY IMAGE
-========================================= */
 
 galleryInput.addEventListener(
   "change",
@@ -384,19 +403,13 @@ galleryInput.addEventListener(
     const file =
       event.target.files[0];
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     handleSelectedImage(file);
 
   }
 );
 
-
-/* =========================================
-   HANDLE IMAGE
-========================================= */
 
 function handleSelectedImage(file) {
 
@@ -410,7 +423,6 @@ function handleSelectedImage(file) {
     );
 
     return;
-
   }
 
   const reader =
@@ -451,7 +463,6 @@ function handleSelectedImage(file) {
     };
 
   reader.readAsDataURL(file);
-
 }
 
 
@@ -463,23 +474,19 @@ removeImageButton.addEventListener(
   "click",
   function() {
 
-    imagePreview.src =
-      "";
+    imagePreview.src = "";
 
     imagePreviewContainer.hidden =
       true;
 
-    cameraInput.value =
-      "";
+    cameraInput.value = "";
 
-    galleryInput.value =
-      "";
+    galleryInput.value = "";
 
     ocrCard.hidden =
       true;
 
-    ocrText.value =
-      "";
+    ocrText.value = "";
 
   }
 );
@@ -546,7 +553,7 @@ function loadImageFromFile(file) {
 
 
 /* =========================================
-   DRAW IMAGE TO CANVAS
+   DRAW IMAGE
 ========================================= */
 
 function drawImageToCanvas(
@@ -580,7 +587,6 @@ function drawImageToCanvas(
       cropHeight * scale
     );
 
-
   const canvas =
     document.createElement(
       "canvas"
@@ -592,7 +598,6 @@ function drawImageToCanvas(
   canvas.height =
     targetHeight;
 
-
   const ctx =
     canvas.getContext(
       "2d",
@@ -601,13 +606,11 @@ function drawImageToCanvas(
       }
     );
 
-
   ctx.imageSmoothingEnabled =
     true;
 
   ctx.imageSmoothingQuality =
     "high";
-
 
   ctx.fillStyle =
     "#ffffff";
@@ -618,7 +621,6 @@ function drawImageToCanvas(
     targetWidth,
     targetHeight
   );
-
 
   ctx.drawImage(
     img,
@@ -632,9 +634,7 @@ function drawImageToCanvas(
     targetHeight
   );
 
-
   return canvas;
-
 }
 
 
@@ -648,10 +648,7 @@ async function prepareOCRImage(
 ) {
 
   const img =
-    await loadImageFromFile(
-      file
-    );
-
+    await loadImageFromFile(file);
 
   const originalWidth =
     img.naturalWidth;
@@ -660,30 +657,20 @@ async function prepareOCRImage(
     img.naturalHeight;
 
 
-  /* =====================================
-     ORIGINAL
-  ===================================== */
+  /* FULL ORIGINAL */
 
-  if (
-    mode === "original"
-  ) {
+  if (mode === "original") {
 
     const canvas =
       drawImageToCanvas(
         img,
         {
-          cropX:
-            0,
-
-          cropY:
-            0,
-
+          cropX: 0,
+          cropY: 0,
           cropWidth:
             originalWidth,
-
           cropHeight:
             originalHeight,
-
           targetWidth:
             Math.min(
               3600,
@@ -695,21 +682,15 @@ async function prepareOCRImage(
         }
       );
 
-
     return canvas.toDataURL(
       "image/png"
     );
-
   }
 
 
-  /* =====================================
-     WIDE FOCUS CROP
-  ===================================== */
+  /* WIDE FOCUS */
 
-  if (
-    mode === "focus"
-  ) {
+  if (mode === "focus") {
 
     let cropX =
       Math.round(
@@ -731,7 +712,6 @@ async function prepareOCRImage(
         originalHeight * 0.87
       );
 
-
     cropX =
       Math.max(
         0,
@@ -743,7 +723,6 @@ async function prepareOCRImage(
         0,
         cropY
       );
-
 
     cropWidth =
       Math.min(
@@ -757,43 +736,27 @@ async function prepareOCRImage(
         originalHeight - cropY
       );
 
-
     const canvas =
       drawImageToCanvas(
         img,
         {
-          cropX:
-            cropX,
-
-          cropY:
-            cropY,
-
-          cropWidth:
-            cropWidth,
-
-          cropHeight:
-            cropHeight,
-
-          targetWidth:
-            3600
+          cropX,
+          cropY,
+          cropWidth,
+          cropHeight,
+          targetWidth: 3600
         }
       );
-
 
     return canvas.toDataURL(
       "image/png"
     );
-
   }
 
 
-  /* =====================================
-     LOWER CROP
-  ===================================== */
+  /* LOWER */
 
-  if (
-    mode === "lower"
-  ) {
+  if (mode === "lower") {
 
     const cropX =
       Math.round(
@@ -815,43 +778,27 @@ async function prepareOCRImage(
         originalHeight * 0.70
       );
 
-
     const canvas =
       drawImageToCanvas(
         img,
         {
-          cropX:
-            cropX,
-
-          cropY:
-            cropY,
-
-          cropWidth:
-            cropWidth,
-
-          cropHeight:
-            cropHeight,
-
-          targetWidth:
-            3600
+          cropX,
+          cropY,
+          cropWidth,
+          cropHeight,
+          targetWidth: 3600
         }
       );
-
 
     return canvas.toDataURL(
       "image/png"
     );
-
   }
 
 
-  /* =====================================
-     CENTER CROP
-  ===================================== */
+  /* CENTER */
 
-  if (
-    mode === "center"
-  ) {
+  if (mode === "center") {
 
     const cropX =
       Math.round(
@@ -873,61 +820,39 @@ async function prepareOCRImage(
         originalHeight * 0.75
       );
 
-
     const canvas =
       drawImageToCanvas(
         img,
         {
-          cropX:
-            cropX,
-
-          cropY:
-            cropY,
-
-          cropWidth:
-            cropWidth,
-
-          cropHeight:
-            cropHeight,
-
-          targetWidth:
-            3600
+          cropX,
+          cropY,
+          cropWidth,
+          cropHeight,
+          targetWidth: 3600
         }
       );
-
 
     return canvas.toDataURL(
       "image/png"
     );
-
   }
 
 
-  /* =====================================
-     NORMAL / THRESHOLD / SHARP
-========================================= */
+  /* NORMAL / THRESHOLD / SHARP */
 
   const canvas =
     drawImageToCanvas(
       img,
       {
-        cropX:
-          0,
-
-        cropY:
-          0,
-
+        cropX: 0,
+        cropY: 0,
         cropWidth:
           originalWidth,
-
         cropHeight:
           originalHeight,
-
-        targetWidth:
-          3200
+        targetWidth: 3200
       }
     );
-
 
   const ctx =
     canvas.getContext(
@@ -937,7 +862,6 @@ async function prepareOCRImage(
       }
     );
 
-
   const imageData =
     ctx.getImageData(
       0,
@@ -946,28 +870,17 @@ async function prepareOCRImage(
       canvas.height
     );
 
-
   const pixels =
     imageData.data;
 
 
-  /* =====================================
-     NORMAL
-  ===================================== */
+  if (mode === "normal") {
 
-  if (
-    mode === "normal"
-  ) {
-
-    const contrast =
-      1.18;
+    const contrast = 1.18;
 
     const factor =
-      (259 *
-        (contrast + 255)) /
-      (255 *
-        (259 - contrast));
-
+      (259 * (contrast + 255)) /
+      (255 * (259 - contrast));
 
     for (
       let i = 0;
@@ -984,18 +897,15 @@ async function prepareOCRImage(
       const b =
         pixels[i + 2];
 
-
       let gray =
         (0.299 * r) +
         (0.587 * g) +
         (0.114 * b);
 
-
       gray =
         factor *
         (gray - 128) +
         128;
-
 
       gray =
         Math.max(
@@ -1006,7 +916,6 @@ async function prepareOCRImage(
           )
         );
 
-
       pixels[i] =
         gray;
 
@@ -1015,19 +924,11 @@ async function prepareOCRImage(
 
       pixels[i + 2] =
         gray;
-
     }
-
   }
 
 
-  /* =====================================
-     THRESHOLD
-  ===================================== */
-
-  if (
-    mode === "threshold"
-  ) {
+  if (mode === "threshold") {
 
     for (
       let i = 0;
@@ -1043,19 +944,16 @@ async function prepareOCRImage(
 
       const b =
         pixels[i + 2];
-
 
       const gray =
         (0.299 * r) +
         (0.587 * g) +
         (0.114 * b);
 
-
       const value =
         gray < 175
           ? 0
           : 255;
-
 
       pixels[i] =
         value;
@@ -1065,29 +963,17 @@ async function prepareOCRImage(
 
       pixels[i + 2] =
         value;
-
     }
-
   }
 
 
-  /* =====================================
-     SHARP
-  ===================================== */
+  if (mode === "sharp") {
 
-  if (
-    mode === "sharp"
-  ) {
-
-    const contrast =
-      1.32;
+    const contrast = 1.32;
 
     const factor =
-      (259 *
-        (contrast + 255)) /
-      (255 *
-        (259 - contrast));
-
+      (259 * (contrast + 255)) /
+      (255 * (259 - contrast));
 
     for (
       let i = 0;
@@ -1104,18 +990,15 @@ async function prepareOCRImage(
       const b =
         pixels[i + 2];
 
-
       let gray =
         (0.299 * r) +
         (0.587 * g) +
         (0.114 * b);
 
-
       gray =
         factor *
         (gray - 128) +
         128;
-
 
       gray =
         Math.max(
@@ -1126,7 +1009,6 @@ async function prepareOCRImage(
           )
         );
 
-
       pixels[i] =
         gray;
 
@@ -1135,9 +1017,7 @@ async function prepareOCRImage(
 
       pixels[i + 2] =
         gray;
-
     }
-
   }
 
 
@@ -1147,16 +1027,14 @@ async function prepareOCRImage(
     0
   );
 
-
   return canvas.toDataURL(
     "image/png"
   );
-
 }
 
 
 /* =========================================
-   OCR ONE PASS
+   OCR
 ========================================= */
 
 async function recognizeOCR(
@@ -1173,7 +1051,6 @@ async function recognizeOCR(
     pageMode
   );
 
-
   await worker.setParameters({
 
     tessedit_pageseg_mode:
@@ -1187,12 +1064,10 @@ async function recognizeOCR(
 
   });
 
-
   const result =
     await worker.recognize(
       imageData
     );
-
 
   const text =
     String(
@@ -1203,7 +1078,6 @@ async function recognizeOCR(
         : ""
     ).trim();
 
-
   const confidence =
     Number(
       result &&
@@ -1213,149 +1087,107 @@ async function recognizeOCR(
         : 0
     );
 
-
   console.log(
     "OCR RESULT:",
     modeName,
     {
-      confidence:
-        confidence,
-
-      text:
-        text
+      confidence,
+      text
     }
   );
 
-
   return {
 
-    text:
-      text,
-
-    confidence:
-      confidence,
-
-    mode:
-      modeName
+    text,
+    confidence,
+    mode: modeName
 
   };
-
 }
 
 
 /* =========================================
-   SCORE OCR
+   OCR SCORE
 ========================================= */
 
-function scoreOCRResult(
-  result
-) {
+function scoreOCRResult(result) {
 
   if (
     !result ||
     !result.text
   ) {
-
     return -999;
-
   }
-
 
   const text =
     String(
       result.text
     ).trim();
 
-
   if (!text) {
-
     return -999;
-
   }
-
 
   const useful =
     text.match(
       /[ก-๙a-zA-Z0-9]/g
     );
 
-
   const usefulCount =
     useful
       ? useful.length
       : 0;
 
-
   if (
     usefulCount === 0
   ) {
-
     return -999;
-
   }
-
 
   const lines =
     text
       .split(/\n+/)
-      .map(
-        function(line) {
-
-          return line.trim();
-
-        }
-      )
-      .filter(
-        function(line) {
-
-          return /[ก-๙a-zA-Z0-9]/.test(
-            line
-          );
-
-        }
-      );
-
+      .map(function(line) {
+        return line.trim();
+      })
+      .filter(function(line) {
+        return /[ก-๙a-zA-Z0-9]/.test(
+          line
+        );
+      });
 
   const lineCount =
     lines.length;
-
 
   const thai =
     text.match(
       /[ก-๙]/g
     );
 
-
   const thaiCount =
     thai
       ? thai.length
       : 0;
-
 
   const english =
     text.match(
       /[a-zA-Z]/g
     );
 
-
   const englishCount =
     english
       ? english.length
       : 0;
-
 
   const confidence =
     Number(
       result.confidence
     ) || 0;
 
-
   let score = 0;
-
 
   score +=
     lineCount * 18;
-
 
   score +=
     Math.min(
@@ -1363,41 +1195,28 @@ function scoreOCRResult(
       100
     ) * 0.8;
 
-
   score +=
     confidence * 0.15;
-
 
   if (
     thaiCount >= 5
   ) {
-
     score += 5;
-
   }
-
 
   if (
     thaiCount >= 15
   ) {
-
     score += 8;
-
   }
-
 
   if (
     englishCount >= 5
   ) {
-
     score += 4;
-
   }
 
-
-  let garbageLines =
-    0;
-
+  let garbageLines = 0;
 
   lines.forEach(
     function(line) {
@@ -1407,34 +1226,27 @@ function scoreOCRResult(
           /[ก-๙a-zA-Z0-9]/g
         );
 
-
       const count =
         usefulLine
           ? usefulLine.length
           : 0;
 
-
       if (
         count <= 1
       ) {
-
         garbageLines++;
-
       }
 
     }
   );
 
-
   score -=
     garbageLines * 5;
-
 
   const longEnglish =
     text.match(
       /\b[a-zA-Z]{13,}\b/g
     );
-
 
   if (
     longEnglish
@@ -1445,12 +1257,10 @@ function scoreOCRResult(
 
   }
 
-
   const strange =
     text.match(
       /[^ก-๙a-zA-Z0-9\s.,!?()\-:/'%&+]/g
     );
-
 
   if (
     strange
@@ -1464,39 +1274,25 @@ function scoreOCRResult(
 
   }
 
-
   console.log(
     "OCR DETAIL SCORE:",
     result.mode,
     {
-      lines:
-        lineCount,
-
-      useful:
-        usefulCount,
-
-      thai:
-        thaiCount,
-
-      english:
-        englishCount,
-
-      confidence:
-        confidence,
-
-      score:
-        score
+      lines: lineCount,
+      useful: usefulCount,
+      thai: thaiCount,
+      english: englishCount,
+      confidence,
+      score
     }
   );
 
-
   return score;
-
 }
 
 
 /* =========================================
-   REMOVE OCR CREDIT LINES
+   REMOVE OCR CREDIT
 ========================================= */
 
 function removeOCRCreditLines(
@@ -1514,39 +1310,29 @@ function removeOCRCreditLines(
             " "
           );
 
-
       if (
         /^unknown\s*[-–—]?\s*$/i.test(
           normalized
         )
       ) {
-
         return false;
-
       }
-
 
       if (
         /^[-–—]\s*unknown\s*[-–—]?\s*$/i.test(
           normalized
         )
       ) {
-
         return false;
-
       }
-
 
       if (
         /^unknown\s*[-–—]\s*$/i.test(
           normalized
         )
       ) {
-
         return false;
-
       }
-
 
       return true;
 
@@ -1558,7 +1344,6 @@ function removeOCRCreditLines(
 
 /* =========================================
    CLEAN OCR
-   GENERAL PURPOSE
 ========================================= */
 
 function cleanOCRText(text) {
@@ -1567,14 +1352,8 @@ function cleanOCRText(text) {
     return "";
   }
 
-
   let cleaned =
     String(text);
-
-
-  /* =====================================
-     NORMALIZE
-  ===================================== */
 
   cleaned =
     cleaned.replace(
@@ -1582,13 +1361,11 @@ function cleanOCRText(text) {
       "\n"
     );
 
-
   cleaned =
     cleaned.replace(
       /\r/g,
       "\n"
     );
-
 
   cleaned =
     cleaned.replace(
@@ -1598,136 +1375,91 @@ function cleanOCRText(text) {
 
 
   /* =====================================
-     REMOVE SYMBOL-ONLY LINES
+     OCR CORRECTIONS
   ===================================== */
-
-  cleaned =
-    cleaned.replace(
-      /^[*|_~`.,;:!?+\-=\/\\]+$/gm,
-      ""
-    );
-
-
-  /* =====================================
-     COMMON THAI OCR CORRECTIONS
-========================================= */
 
   const corrections = [
 
     {
-      pattern:
-        /ช่วขลด/g,
-      replacement:
-        "ช่วยลด"
+      pattern: /ช่วขลด/g,
+      replacement: "ช่วยลด"
     },
 
     {
-      pattern:
-        /ชว่ยลด/g,
-      replacement:
-        "ช่วยลด"
+      pattern: /ชว่ยลด/g,
+      replacement: "ช่วยลด"
     },
 
     {
-      pattern:
-        /ชว่ขลด/g,
-      replacement:
-        "ช่วยลด"
+      pattern: /ชว่ขลด/g,
+      replacement: "ช่วยลด"
     },
 
     {
-      pattern:
-        /ช่วลด/g,
-      replacement:
-        "ช่วยลด"
+      pattern: /ช่วลด/g,
+      replacement: "ช่วยลด"
     },
 
     {
-      pattern:
-        /ธีไซเคิลไล้/g,
-      replacement:
-        "รีไซเคิลได้"
+      pattern: /ธีไซเคิลไล้/g,
+      replacement: "รีไซเคิลได้"
     },
 
     {
-      pattern:
-        /ธีไซเคิลได้/g,
-      replacement:
-        "รีไซเคิลได้"
+      pattern: /ธีไซเคิลได้/g,
+      replacement: "รีไซเคิลได้"
     },
 
     {
-      pattern:
-        /รีไซเคิลไล้/g,
-      replacement:
-        "รีไซเคิลได้"
+      pattern: /รีไซเคิลไล้/g,
+      replacement: "รีไซเคิลได้"
     },
 
     {
-      pattern:
-        /รีไซเคิลไล/g,
-      replacement:
-        "รีไซเคิลได้"
+      pattern: /รีไซเคิลไล/g,
+      replacement: "รีไซเคิลได้"
     },
 
     {
-      pattern:
-        /รีไซเคิลไต้/g,
-      replacement:
-        "รีไซเคิลได้"
+      pattern: /รีไซเคิลไต้/g,
+      replacement: "รีไซเคิลได้"
     },
 
     {
-      pattern:
-        /ผลาสติก/g,
-      replacement:
-        "พลาสติก"
+      pattern: /ผลาสติก/g,
+      replacement: "พลาสติก"
     },
 
     {
-      pattern:
-        /พลาสตก/g,
-      replacement:
-        "พลาสติก"
+      pattern: /พลาสตก/g,
+      replacement: "พลาสติก"
     },
 
     {
-      pattern:
-        /พลาสตค/g,
-      replacement:
-        "พลาสติก"
+      pattern: /พลาสตค/g,
+      replacement: "พลาสติก"
     },
 
     {
-      pattern:
-        /โปรดริบประทาน/g,
-      replacement:
-        "โปรดรับประทาน"
+      pattern: /โปรดริบประทาน/g,
+      replacement: "โปรดรับประทาน"
     },
 
     {
-      pattern:
-        /โปรดรบประทาน/g,
-      replacement:
-        "โปรดรับประทาน"
+      pattern: /โปรดรบประทาน/g,
+      replacement: "โปรดรับประทาน"
     },
 
-    /* แก้คำว่า ทัง → ทั้ง */
+    /* สำคัญ */
 
     {
-      pattern:
-        /ทัง/g,
-      replacement:
-        "ทั้ง"
+      pattern: /สําหรับ/g,
+      replacement: "สำหรับ"
     },
 
-    /* แก้ สําหรับ → สำหรับ */
-
     {
-      pattern:
-        /สําหรับ/g,
-      replacement:
-        "สำหรับ"
+      pattern: /ทัง/g,
+      replacement: "ทั้ง"
     }
 
   ];
@@ -1747,7 +1479,7 @@ function cleanOCRText(text) {
 
 
   /* =====================================
-     REMOVE COMMON OCR GARBAGE
+     REMOVE GARBAGE OCR
   ===================================== */
 
   cleaned =
@@ -1756,13 +1488,11 @@ function cleanOCRText(text) {
       ""
     );
 
-
   cleaned =
     cleaned.replace(
       /^\s*W\s*$/gim,
       ""
     );
-
 
   cleaned =
     cleaned.replace(
@@ -1770,13 +1500,11 @@ function cleanOCRText(text) {
       ""
     );
 
-
   cleaned =
     cleaned.replace(
       /^\s*ศศ\s*$/gim,
       ""
     );
-
 
   cleaned =
     cleaned.replace(
@@ -1786,7 +1514,7 @@ function cleanOCRText(text) {
 
 
   /* =====================================
-     ENGLISH OCR REPAIR
+     FIX RECOMMENDED
   ===================================== */
 
   cleaned =
@@ -1795,13 +1523,11 @@ function cleanOCRText(text) {
       "Recommended"
     );
 
-
   cleaned =
     cleaned.replace(
       /Recommend\s+ed/gi,
       "Recommended"
     );
-
 
   cleaned =
     cleaned.replace(
@@ -1809,20 +1535,17 @@ function cleanOCRText(text) {
       "Recommended for"
     );
 
-
   cleaned =
     cleaned.replace(
       /Recommend\s*\n\s*for/gi,
       "Recommended for"
     );
 
-
   cleaned =
     cleaned.replace(
       /ed\s+for\s+immediate\s+consumption/gi,
       "Recommended for immediate consumption"
     );
-
 
   cleaned =
     cleaned.replace(
@@ -1832,31 +1555,19 @@ function cleanOCRText(text) {
 
 
   /* =====================================
-     SPLIT LINES
+     LINE CLEANUP
   ===================================== */
 
   let lines =
     cleaned
       .split("\n")
-      .map(
-        function(line) {
+      .map(function(line) {
+        return line.trim();
+      })
+      .filter(function(line) {
+        return line.length > 0;
+      });
 
-          return line.trim();
-
-        }
-      )
-      .filter(
-        function(line) {
-
-          return line.length > 0;
-
-        }
-      );
-
-
-  /* =====================================
-     REMOVE GARBAGE LINES
-  ===================================== */
 
   lines =
     lines.filter(
@@ -1866,7 +1577,6 @@ function cleanOCRText(text) {
           return false;
         }
 
-
         if (
           /^Ww$/i.test(line) ||
           /^W$/i.test(line) ||
@@ -1874,42 +1584,30 @@ function cleanOCRText(text) {
           /^ศศ$/.test(line) ||
           /^ศ$/.test(line)
         ) {
-
           return false;
-
         }
-
 
         const useful =
           line.match(
             /[ก-๙a-zA-Z0-9]/g
           );
 
-
         const count =
           useful
             ? useful.length
             : 0;
 
-
         if (
           count === 0
         ) {
-
           return false;
-
         }
-
 
         return true;
 
       }
     );
 
-
-  /* =====================================
-     REMOVE CREDIT
-  ===================================== */
 
   lines =
     removeOCRCreditLines(
@@ -1918,7 +1616,8 @@ function cleanOCRText(text) {
 
 
   /* =====================================
-     CORRECT EACH LINE AGAIN
+     APPLY CORRECTIONS AGAIN
+     AFTER LINE SPLIT
   ===================================== */
 
   lines =
@@ -1931,13 +1630,11 @@ function cleanOCRText(text) {
             "ช่วยลด"
           );
 
-
         line =
           line.replace(
             /ชว่ยลด/g,
             "ช่วยลด"
           );
-
 
         line =
           line.replace(
@@ -1945,13 +1642,11 @@ function cleanOCRText(text) {
             "ช่วยลด"
           );
 
-
         line =
           line.replace(
             /ช่วลด/g,
             "ช่วยลด"
           );
-
 
         line =
           line.replace(
@@ -1959,13 +1654,11 @@ function cleanOCRText(text) {
             "รีไซเคิลได้"
           );
 
-
         line =
           line.replace(
             /ธีไซเคิลได้/g,
             "รีไซเคิลได้"
           );
-
 
         line =
           line.replace(
@@ -1973,13 +1666,11 @@ function cleanOCRText(text) {
             "รีไซเคิลได้"
           );
 
-
         line =
           line.replace(
             /รีไซเคิลไต้/g,
             "รีไซเคิลได้"
           );
-
 
         line =
           line.replace(
@@ -1987,13 +1678,11 @@ function cleanOCRText(text) {
             "พลาสติก"
           );
 
-
         line =
           line.replace(
             /พลาสตก/g,
             "พลาสติก"
           );
-
 
         line =
           line.replace(
@@ -2001,13 +1690,11 @@ function cleanOCRText(text) {
             "พลาสติก"
           );
 
-
         line =
           line.replace(
             /โปรดริบประทาน/g,
             "โปรดรับประทาน"
           );
-
 
         line =
           line.replace(
@@ -2015,15 +1702,7 @@ function cleanOCRText(text) {
             "โปรดรับประทาน"
           );
 
-
-        /* แก้คำที่ OCR อ่านผิด */
-
-        line =
-          line.replace(
-            /ทัง/g,
-            "ทั้ง"
-          );
-
+        /* สำคัญ */
 
         line =
           line.replace(
@@ -2031,6 +1710,11 @@ function cleanOCRText(text) {
             "สำหรับ"
           );
 
+        line =
+          line.replace(
+            /ทัง/g,
+            "ทั้ง"
+          );
 
         return line.trim();
 
@@ -2043,7 +1727,6 @@ function cleanOCRText(text) {
   ===================================== */
 
   const mergedLines = [];
-
 
   for (
     let i = 0;
@@ -2059,8 +1742,12 @@ function cleanOCRText(text) {
 
 
     if (
-      /^Recommend$/i.test(current) &&
-      /^ed\b/i.test(next)
+      /^Recommend$/i.test(
+        current
+      ) &&
+      /^ed\b/i.test(
+        next
+      )
     ) {
 
       mergedLines.push(
@@ -2071,13 +1758,16 @@ function cleanOCRText(text) {
       i++;
 
       continue;
-
     }
 
 
     if (
-      /^ed$/i.test(current) &&
-      /^for\s+/i.test(next)
+      /^ed$/i.test(
+        current
+      ) &&
+      /^for\s+/i.test(
+        next
+      )
     ) {
 
       mergedLines.push(
@@ -2088,13 +1778,16 @@ function cleanOCRText(text) {
       i++;
 
       continue;
-
     }
 
 
     if (
-      /^Recommended$/i.test(current) &&
-      /^for\s+/i.test(next)
+      /^Recommended$/i.test(
+        current
+      ) &&
+      /^for\s+/i.test(
+        next
+      )
     ) {
 
       mergedLines.push(
@@ -2106,7 +1799,6 @@ function cleanOCRText(text) {
       i++;
 
       continue;
-
     }
 
 
@@ -2116,14 +1808,9 @@ function cleanOCRText(text) {
 
   }
 
-
   lines =
     mergedLines;
 
-
-  /* =====================================
-     REMOVE CREDIT AGAIN
-  ===================================== */
 
   lines =
     removeOCRCreditLines(
@@ -2131,14 +1818,8 @@ function cleanOCRText(text) {
     );
 
 
-  /* =====================================
-     FINAL CLEANUP
-  ===================================== */
-
   cleaned =
-    lines.join(
-      "\n"
-    );
+    lines.join("\n");
 
 
   cleaned =
@@ -2147,20 +1828,17 @@ function cleanOCRText(text) {
       "$1"
     );
 
-
   cleaned =
     cleaned.replace(
       /([(])\s+/g,
       "$1"
     );
 
-
   cleaned =
     cleaned.replace(
       /[ \t]+/g,
       " "
     );
-
 
   cleaned =
     cleaned.replace(
@@ -2169,8 +1847,25 @@ function cleanOCRText(text) {
     );
 
 
-  return cleaned.trim();
+  /* =====================================
+     FINAL CORRECTION
+     ป้องกันกรณี OCR คืนค่า Unicode
+     คนละรูปแบบ
+  ===================================== */
 
+  cleaned =
+    cleaned.replace(
+      /ส[\u0E4D]าหรับ/g,
+      "สำหรับ"
+    );
+
+  cleaned =
+    cleaned.replace(
+      /ทัง/g,
+      "ทั้ง"
+    );
+
+  return cleaned.trim();
 }
 
 
@@ -2182,8 +1877,7 @@ function selectBestOCRResult(
   results
 ) {
 
-  let best =
-    null;
+  let best = null;
 
   let bestScore =
     -999;
@@ -2196,17 +1890,13 @@ function selectBestOCRResult(
         !result ||
         !result.text
       ) {
-
         return;
-
       }
-
 
       const score =
         scoreOCRResult(
           result
         );
-
 
       console.log(
         "OCR SCORE:",
@@ -2237,23 +1927,16 @@ function selectBestOCRResult(
     best
       ? best.mode
       : "none",
-
     bestScore
   );
 
 
   return (
-    best || {
-
-      text:
-        "",
-
-      confidence:
-        0,
-
-      mode:
-        ""
-
+    best ||
+    {
+      text: "",
+      confidence: 0,
+      mode: ""
     }
   );
 
@@ -2261,16 +1944,13 @@ function selectBestOCRResult(
 
 
 /* =========================================
-   TESSERACT OCR
+   RUN OCR
 ========================================= */
 
-async function runOCR(
-  file
-) {
+async function runOCR(file) {
 
   ocrCard.hidden =
     false;
-
 
   ocrText.value =
     "กำลังเตรียมระบบ OCR...";
@@ -2281,18 +1961,13 @@ async function runOCR(
     const worker =
       await getTesseractWorker();
 
-
     const results = [];
 
 
-    /* =====================================
-       PASS 1
-       WIDE FOCUS + PSM 6
-    ===================================== */
+    /* 1 */
 
     ocrText.value =
       "กำลังอ่านข้อความจากภาพ...";
-
 
     showStatus(
       "กำลังอ่านข้อความ...",
@@ -2321,10 +1996,7 @@ async function runOCR(
     );
 
 
-    /* =====================================
-       PASS 2
-       WIDE FOCUS + PSM 11
-    ===================================== */
+    /* 2 */
 
     ocrText.value =
       "กำลังอ่านข้อความแบบละเอียด...";
@@ -2344,10 +2016,7 @@ async function runOCR(
     );
 
 
-    /* =====================================
-       PASS 3
-       LOWER + PSM 6
-    ===================================== */
+    /* 3 */
 
     ocrText.value =
       "กำลังอ่านข้อความส่วนล่าง...";
@@ -2374,10 +2043,7 @@ async function runOCR(
     );
 
 
-    /* =====================================
-       PASS 4
-       LOWER + PSM 11
-    ===================================== */
+    /* 4 */
 
     const lowerSparseResult =
       await recognizeOCR(
@@ -2393,10 +2059,7 @@ async function runOCR(
     );
 
 
-    /* =====================================
-       PASS 5
-       CENTER + PSM 6
-    ===================================== */
+    /* 5 */
 
     ocrText.value =
       "กำลังตรวจสอบข้อความอีกครั้ง...";
@@ -2423,10 +2086,7 @@ async function runOCR(
     );
 
 
-    /* =====================================
-       PASS 6
-       FULL IMAGE + PSM 6
-    ===================================== */
+    /* 6 */
 
     ocrText.value =
       "กำลังอ่านข้อความจากภาพทั้งหมด...";
@@ -2453,10 +2113,7 @@ async function runOCR(
     );
 
 
-    /* =====================================
-       PASS 7
-       FULL IMAGE + PSM 11
-    ===================================== */
+    /* 7 */
 
     ocrText.value =
       "กำลังตรวจสอบภาพทั้งหมด...";
@@ -2476,9 +2133,7 @@ async function runOCR(
     );
 
 
-    /* =====================================
-       SELECT BEST
-    ===================================== */
+    /* SELECT */
 
     const bestResult =
       selectBestOCRResult(
@@ -2493,21 +2148,14 @@ async function runOCR(
       ocrText.value =
         "ไม่พบข้อความในรูปภาพ";
 
-
       showStatus(
         "ไม่พบข้อความในรูปภาพ",
         "error"
       );
 
-
       return;
-
     }
 
-
-    /* =====================================
-       CLEAN + CORRECT OCR
-    ===================================== */
 
     const cleanedText =
       cleanOCRText(
@@ -2605,9 +2253,7 @@ useOcrButton.addEventListener(
         "error"
       );
 
-
       return;
-
     }
 
 
@@ -2632,7 +2278,7 @@ useOcrButton.addEventListener(
 
 
 /* =========================================
-   CLEAR INPUT
+   CLEAR
 ========================================= */
 
 clearInputButton.addEventListener(
@@ -2642,21 +2288,17 @@ clearInputButton.addEventListener(
     inputText.value =
       "";
 
-
     resultText.textContent =
       "คำแปลจะแสดงที่นี่";
-
 
     resultText.classList.add(
       "empty"
     );
 
-
     showStatus(
       "ล้างข้อความแล้ว",
       "success"
     );
-
 
     inputText.focus();
 
@@ -2665,7 +2307,7 @@ clearInputButton.addEventListener(
 
 
 /* =========================================
-   TRANSLATE
+   TRANSLATE BUTTON
 ========================================= */
 
 translateButton.addEventListener(
@@ -2702,26 +2344,19 @@ function removeDuplicateTranslationBlocks(
         "\n"
       )
       .split("\n")
-      .map(
-        function(line) {
-
-          return line.trim();
-
-        }
-      )
-      .filter(
-        function(line) {
-
-          return line.length > 0;
-
-        }
-      );
+      .map(function(line) {
+        return line.trim();
+      })
+      .filter(function(line) {
+        return line.length > 0;
+      });
 
 
   const seen =
     new Set();
 
-  const filtered = [];
+  const filtered =
+    [];
 
 
   lines.forEach(
@@ -2745,9 +2380,7 @@ function removeDuplicateTranslationBlocks(
         isLongSentence &&
         seen.has(key)
       ) {
-
         return;
-
       }
 
 
@@ -2755,7 +2388,9 @@ function removeDuplicateTranslationBlocks(
         isLongSentence
       ) {
 
-        seen.add(key);
+        seen.add(
+          key
+        );
 
       }
 
@@ -2792,6 +2427,7 @@ function removeDuplicateTranslationBlocks(
 
       outerLoop:
 
+
       for (
         let i = 0;
         i < lines.length;
@@ -2809,9 +2445,7 @@ function removeDuplicateTranslationBlocks(
           block.length !==
           blockSize
         ) {
-
           continue;
-
         }
 
 
@@ -2827,7 +2461,9 @@ function removeDuplicateTranslationBlocks(
           );
 
 
-        if (!validBlock) {
+        if (
+          !validBlock
+        ) {
           continue;
         }
 
@@ -2835,7 +2471,8 @@ function removeDuplicateTranslationBlocks(
         for (
           let j = i + 1;
           j <=
-          lines.length - blockSize;
+          lines.length -
+          blockSize;
           j++
         ) {
 
@@ -2911,12 +2548,11 @@ function removeDuplicateTranslationBlocks(
   return lines.join(
     "\n"
   );
-
 }
 
 
 /* =========================================
-   CLEAN TRANSLATION RESULT
+   CLEAN TRANSLATION
 ========================================= */
 
 function cleanTranslationResult(
@@ -2972,7 +2608,7 @@ function cleanTranslationResult(
 
 
 /* =========================================
-   TRANSLATE FUNCTION
+   TRANSLATE
 ========================================= */
 
 async function translateText() {
@@ -2988,12 +2624,9 @@ async function translateText() {
       "error"
     );
 
-
     inputText.focus();
 
-
     return;
-
   }
 
 
@@ -3001,7 +2634,6 @@ async function translateText() {
 
     resultText.textContent =
       "ระบบแปลภาษากำลังเตรียมเชื่อมต่อ...";
-
 
     resultText.classList.remove(
       "empty"
@@ -3013,9 +2645,7 @@ async function translateText() {
       "error"
     );
 
-
     return;
-
   }
 
 
@@ -3031,20 +2661,15 @@ async function translateText() {
       await fetch(
         API_URL,
         {
-
-          method:
-            "POST",
+          method: "POST",
 
           headers: {
-
             "Content-Type":
               "text/plain;charset=utf-8"
-
           },
 
           body:
             JSON.stringify({
-
               action:
                 "translate",
 
@@ -3056,14 +2681,14 @@ async function translateText() {
 
               target:
                 targetLanguage
-
             })
-
         }
       );
 
 
-    if (!response.ok) {
+    if (
+      !response.ok
+    ) {
 
       throw new Error(
         "HTTP " +
@@ -3077,7 +2702,9 @@ async function translateText() {
       await response.json();
 
 
-    if (!data.success) {
+    if (
+      !data.success
+    ) {
 
       throw new Error(
         data.message ||
@@ -3089,7 +2716,8 @@ async function translateText() {
 
     const translation =
       cleanTranslationResult(
-        data.translation || ""
+        data.translation ||
+        ""
       );
 
 
@@ -3133,7 +2761,9 @@ async function translateText() {
 
   } finally {
 
-    setLoading(false);
+    setLoading(
+      false
+    );
 
   }
 
@@ -3149,7 +2779,9 @@ speakResultButton.addEventListener(
   function() {
 
     const text =
-      resultText.classList.contains("empty")
+      resultText.classList.contains(
+        "empty"
+      )
         ? ""
         : resultText.textContent.trim();
 
@@ -3161,9 +2793,7 @@ speakResultButton.addEventListener(
         "error"
       );
 
-
       return;
-
     }
 
 
@@ -3195,9 +2825,7 @@ speakOcrButton.addEventListener(
         "error"
       );
 
-
       return;
-
     }
 
 
@@ -3211,7 +2839,7 @@ speakOcrButton.addEventListener(
 
 
 /* =========================================
-   TEXT TO SPEECH
+   SPEAK TEXT
 ========================================= */
 
 function speakText(
@@ -3220,7 +2848,10 @@ function speakText(
 ) {
 
   if (
-    !("speechSynthesis" in window)
+    !(
+      "speechSynthesis" in
+      window
+    )
   ) {
 
     showStatus(
@@ -3228,9 +2859,7 @@ function speakText(
       "error"
     );
 
-
     return;
-
   }
 
 
@@ -3252,10 +2881,8 @@ function speakText(
   utterance.rate =
     0.9;
 
-
   utterance.pitch =
     1;
-
 
   utterance.volume =
     1;
@@ -3307,7 +2934,9 @@ copyResultButton.addEventListener(
   async function() {
 
     const text =
-      resultText.classList.contains("empty")
+      resultText.classList.contains(
+        "empty"
+      )
         ? ""
         : resultText.textContent.trim();
 
@@ -3319,9 +2948,7 @@ copyResultButton.addEventListener(
         "error"
       );
 
-
       return;
-
     }
 
 
@@ -3383,7 +3010,8 @@ copyResultButton.addEventListener(
 
 function setLoading(
   loading,
-  message = "กำลังดำเนินการ..."
+  message =
+    "กำลังดำเนินการ..."
 ) {
 
   loadingBox.hidden =
@@ -3394,7 +3022,9 @@ function setLoading(
     loading;
 
 
-  if (loading) {
+  if (
+    loading
+  ) {
 
     loadingText.textContent =
       message;
@@ -3421,7 +3051,9 @@ function showStatus(
     "status-message";
 
 
-  if (type) {
+  if (
+    type
+  ) {
 
     statusMessage.classList.add(
       type
@@ -3461,7 +3093,7 @@ function hideStatus() {
 
 
 /* =========================================
-   KEYBOARD SHORTCUT
+   KEYBOARD
 ========================================= */
 
 inputText.addEventListener(
@@ -3469,8 +3101,10 @@ inputText.addEventListener(
   function(event) {
 
     if (
-      (event.ctrlKey ||
-       event.metaKey) &&
+      (
+        event.ctrlKey ||
+        event.metaKey
+      ) &&
       event.key === "Enter"
     ) {
 
