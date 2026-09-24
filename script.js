@@ -3,10 +3,9 @@
    Thai ↔ English
    OCR + Translation
 
-   VERSION 20
-   General OCR
-   Camera + Gallery
-   Line-level OCR filtering
+   VERSION 21
+   Improved Camera OCR
+   General Thai + English OCR
 ========================================================= */
 
 const API_URL =
@@ -283,7 +282,6 @@ function loadTesseract() {
 
 /* =========================================================
    OCR WORKERS
-   แยกภาษาไทยและอังกฤษ
 ========================================================= */
 
 async function getOCRWorkers() {
@@ -497,7 +495,6 @@ if (galleryInput) {
 
 /* =========================================================
    IMAGE FILE
-   Preview = รูปต้นฉบับ
 ========================================================= */
 
 function handleImageFile(file) {
@@ -532,13 +529,6 @@ function handleImageFile(file) {
 
   }
 
-
-  /*
-    ใช้ไฟล์จริงโดยตรง
-    ไม่ crop
-    ไม่ resize
-    ไม่ threshold
-  */
 
   selectedImageUrl =
     URL.createObjectURL(
@@ -640,53 +630,98 @@ function clearSelectedImage() {
 
 /* =========================================================
    LOAD IMAGE
+   รองรับ orientation ของภาพจากกล้อง
 ========================================================= */
 
 function loadImage(file) {
 
   return new Promise(
-    (resolve, reject) => {
+    async (resolve, reject) => {
 
-      const url =
-        URL.createObjectURL(
-          file
-        );
+      try {
+
+        /*
+          createImageBitmap ช่วยจัดการ orientation
+          ของรูปจากกล้องบน browser รุ่นใหม่
+        */
+
+        if (
+          "createImageBitmap" in window
+        ) {
+
+          try {
+
+            const bitmap =
+              await createImageBitmap(
+                file,
+                {
+                  imageOrientation:
+                    "from-image"
+                }
+              );
+
+            resolve(bitmap);
+
+            return;
+
+          } catch (bitmapError) {
+
+            console.warn(
+              "createImageBitmap fallback:",
+              bitmapError
+            );
+
+          }
+
+        }
 
 
-      const img =
-        new Image();
-
-
-      img.onload =
-        () => {
-
-          URL.revokeObjectURL(
-            url
+        const url =
+          URL.createObjectURL(
+            file
           );
 
-          resolve(img);
 
-        };
-
-
-      img.onerror =
-        () => {
-
-          URL.revokeObjectURL(
-            url
-          );
-
-          reject(
-            new Error(
-              "ไม่สามารถเปิดรูปได้"
-            )
-          );
-
-        };
+        const img =
+          new Image();
 
 
-      img.src =
-        url;
+        img.onload =
+          () => {
+
+            URL.revokeObjectURL(
+              url
+            );
+
+            resolve(img);
+
+          };
+
+
+        img.onerror =
+          () => {
+
+            URL.revokeObjectURL(
+              url
+            );
+
+            reject(
+              new Error(
+                "ไม่สามารถเปิดรูปได้"
+              )
+            );
+
+          };
+
+
+        img.src =
+          url;
+
+      } catch (error) {
+
+        reject(error);
+
+      }
 
     }
   );
@@ -695,12 +730,10 @@ function loadImage(file) {
 
 
 /* =========================================================
-   PREPARE OCR IMAGE
-   ไม่ crop
-   รักษาสัดส่วน
+   CREATE OCR CANVAS
 ========================================================= */
 
-async function prepareOCRImage(
+async function createBaseCanvas(
   file
 ) {
 
@@ -709,13 +742,13 @@ async function prepareOCRImage(
 
 
   const width =
-    img.naturalWidth ||
-    img.width;
+    img.width ||
+    img.naturalWidth;
 
 
   const height =
-    img.naturalHeight ||
-    img.height;
+    img.height ||
+    img.naturalHeight;
 
 
   if (!width || !height) {
@@ -728,12 +761,12 @@ async function prepareOCRImage(
 
 
   /*
-    ลดเฉพาะรูปที่ใหญ่มาก
-    เพื่อไม่ให้มือถือช้า
+    รูปกล้องบางเครื่องใหญ่มาก
+    จำกัดขนาดเพื่อไม่ให้มือถือค้าง
   */
 
   const MAX_SIZE =
-    2800;
+    3200;
 
 
   let scale = 1;
@@ -790,7 +823,6 @@ async function prepareOCRImage(
   ctx.imageSmoothingEnabled =
     true;
 
-
   ctx.imageSmoothingQuality =
     "high";
 
@@ -804,13 +836,286 @@ async function prepareOCRImage(
   );
 
 
+  if (
+    typeof img.close ===
+    "function"
+  ) {
+
+    try {
+      img.close();
+    } catch (_) {}
+
+  }
+
+
   return canvas;
 
 }
 
 
 /* =========================================================
-   OCR
+   IMAGE PREPROCESS
+   ปรับภาพให้เหมาะกับ OCR
+========================================================= */
+
+function createEnhancedCanvas(
+  sourceCanvas
+) {
+
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
+
+
+  canvas.width =
+    sourceCanvas.width;
+
+  canvas.height =
+    sourceCanvas.height;
+
+
+  const ctx =
+    canvas.getContext(
+      "2d",
+      {
+        willReadFrequently:
+          true
+      }
+    );
+
+
+  ctx.drawImage(
+    sourceCanvas,
+    0,
+    0
+  );
+
+
+  const imageData =
+    ctx.getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+
+  const data =
+    imageData.data;
+
+
+  /*
+    ปรับ contrast + brightness
+    แบบไม่ threshold แข็ง
+    เพื่อรักษาตัวอักษรสีเทา
+  */
+
+  const contrast =
+    1.18;
+
+  const brightness =
+    6;
+
+
+  const factor =
+    (259 *
+      (contrast + 255)) /
+    (255 *
+      (259 - contrast));
+
+
+  for (
+    let i = 0;
+    i < data.length;
+    i += 4
+  ) {
+
+    let r =
+      data[i];
+
+    let g =
+      data[i + 1];
+
+    let b =
+      data[i + 2];
+
+
+    /*
+      grayscale
+    */
+
+    const gray =
+      0.299 * r +
+      0.587 * g +
+      0.114 * b;
+
+
+    let value =
+      factor *
+        (gray - 128) +
+      128 +
+      brightness;
+
+
+    value =
+      Math.max(
+        0,
+        Math.min(
+          255,
+          value
+        )
+      );
+
+
+    data[i] =
+      value;
+
+    data[i + 1] =
+      value;
+
+    data[i + 2] =
+      value;
+
+  }
+
+
+  ctx.putImageData(
+    imageData,
+    0,
+    0
+  );
+
+
+  return canvas;
+
+}
+
+
+/* =========================================================
+   LIGHT SHARPEN
+========================================================= */
+
+function createSharpCanvas(
+  sourceCanvas
+) {
+
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
+
+
+  canvas.width =
+    sourceCanvas.width;
+
+  canvas.height =
+    sourceCanvas.height;
+
+
+  const ctx =
+    canvas.getContext(
+      "2d"
+    );
+
+
+  /*
+    ภาพหลักก่อน
+  */
+
+  ctx.drawImage(
+    sourceCanvas,
+    0,
+    0
+  );
+
+
+  /*
+    overlay แบบเบา ๆ
+    ไม่ทำให้ตัวอักษรแตก
+  */
+
+  ctx.globalAlpha =
+    0.18;
+
+  ctx.drawImage(
+    sourceCanvas,
+    -1,
+    0
+  );
+
+  ctx.drawImage(
+    sourceCanvas,
+    1,
+    0
+  );
+
+  ctx.drawImage(
+    sourceCanvas,
+    0,
+    -1
+  );
+
+  ctx.drawImage(
+    sourceCanvas,
+    0,
+    1
+  );
+
+
+  ctx.globalAlpha =
+    1;
+
+
+  return canvas;
+
+}
+
+
+/* =========================================================
+   PREPARE OCR IMAGES
+========================================================= */
+
+async function prepareOCRImages(
+  file
+) {
+
+  const baseCanvas =
+    await createBaseCanvas(
+      file
+    );
+
+
+  const enhancedCanvas =
+    createEnhancedCanvas(
+      baseCanvas
+    );
+
+
+  const sharpCanvas =
+    createSharpCanvas(
+      enhancedCanvas
+    );
+
+
+  return {
+
+    base:
+      baseCanvas,
+
+    enhanced:
+      enhancedCanvas,
+
+    sharp:
+      sharpCanvas
+
+  };
+
+}
+
+
+/* =========================================================
+   OCR RECOGNIZE
 ========================================================= */
 
 async function recognizeOCR(
@@ -889,6 +1194,11 @@ function cleanLine(text) {
       .trim();
 
 
+  /*
+    แก้เฉพาะ OCR error ทั่วไป
+    ไม่ผูกกับประโยคตัวอย่าง
+  */
+
   const replacements = [
 
     ["ช่วขลด", "ช่วยลด"],
@@ -930,16 +1240,16 @@ function cleanLine(text) {
   }
 
 
-  /*
-    ตัด unknown
-  */
-
   const compact =
     result.replace(
       /\s/g,
       ""
     );
 
+
+  /*
+    unknown noise
+  */
 
   if (
     /^[-~_]*unknown[-~_]*$/i.test(
@@ -963,16 +1273,9 @@ function cleanLine(text) {
   }
 
 
-  if (
-    /^(W|Ww|ww|ศ|ศศ)$/i.test(
-      compact
-    )
-  ) {
-
-    return "";
-
-  }
-
+  /*
+    มีแต่เครื่องหมาย
+  */
 
   if (
     /^[^ก-๙a-zA-Z0-9]+$/u.test(
@@ -993,8 +1296,12 @@ function cleanLine(text) {
     ).length;
 
 
-  if (useful < 2) {
+  if (
+    useful < 2
+  ) {
+
     return "";
+
   }
 
 
@@ -1004,7 +1311,7 @@ function cleanLine(text) {
 
 
 /* =========================================================
-   THAI LINE FILTER
+   THAI QUALITY
 ========================================================= */
 
 function isGoodThaiLine(
@@ -1066,11 +1373,11 @@ function isGoodThaiLine(
 
 
   /*
-    ต้องมีไทยจริง
+    ต้องมีภาษาไทยจริง
   */
 
   if (
-    thaiCount < 4
+    thaiCount < 3
   ) {
 
     return false;
@@ -1079,9 +1386,33 @@ function isGoodThaiLine(
 
 
   /*
-    ถ้า confidence ต่ำมาก
-    และมีตัวเลข/สัญลักษณ์เยอะ
+    ถ้ามีไทยปนอังกฤษ/ตัวเลขมากผิดปกติ
     มักเป็น noise
+  */
+
+  const mixedNoise =
+    (
+      latinCount +
+      digitCount
+    ) /
+    Math.max(
+      thaiCount,
+      1
+    );
+
+
+  if (
+    confidence < 55 &&
+    mixedNoise > 0.55
+  ) {
+
+    return false;
+
+  }
+
+
+  /*
+    สัญลักษณ์เยอะเกินไป
   */
 
   const noiseRatio =
@@ -1096,18 +1427,8 @@ function isGoodThaiLine(
 
 
   if (
-    confidence < 55 &&
-    noiseRatio > 0.10
-  ) {
-
-    return false;
-
-  }
-
-
-  if (
-    confidence < 70 &&
-    noiseRatio > 0.18
+    confidence < 60 &&
+    noiseRatio > 0.28
   ) {
 
     return false;
@@ -1116,18 +1437,14 @@ function isGoodThaiLine(
 
 
   /*
-    ถ้ามีอังกฤษ/ตัวเลขปนเยอะผิดปกติ
-    และ confidence ต่ำ
-    ตัดออก
+    บรรทัดที่เหมือนตัวอักษรมั่ว
+    เช่นไม่มีสระ/ตัวสะกดที่สมเหตุสมผล
+    ใช้เป็นเงื่อนไขเฉพาะ confidence ต่ำ
   */
 
   if (
-    confidence < 75 &&
-    (
-      latinCount +
-      digitCount
-    ) >
-      thaiCount * 0.45
+    confidence < 45 &&
+    thaiCount < 5
   ) {
 
     return false;
@@ -1141,7 +1458,7 @@ function isGoodThaiLine(
 
 
 /* =========================================================
-   ENGLISH LINE FILTER
+   ENGLISH QUALITY
 ========================================================= */
 
 function isGoodEnglishLine(
@@ -1188,6 +1505,14 @@ function isGoodEnglishLine(
     ).length;
 
 
+  const symbolCount =
+    (
+      compact.match(
+        /[^a-zA-Z0-9ก-๙]/g
+      ) || []
+    ).length;
+
+
   const confidence =
     Number(
       line.confidence || 0
@@ -1204,7 +1529,7 @@ function isGoodEnglishLine(
 
 
   /*
-    ถ้าเป็นไทยเป็นหลัก
+    ถ้าไทยมากกว่าอังกฤษ
     ไม่ใช่บรรทัดอังกฤษ
   */
 
@@ -1219,13 +1544,13 @@ function isGoodEnglishLine(
 
 
   /*
-    ตัวเลขเยอะผิดปกติ
+    ตัวเลขเยอะเกิน
   */
 
   if (
     digitCount >
-    englishCount * 0.4 &&
-    confidence < 80
+    englishCount * 0.5 &&
+    confidence < 75
   ) {
 
     return false;
@@ -1234,9 +1559,32 @@ function isGoodEnglishLine(
 
 
   /*
-    บรรทัดอังกฤษที่ confidence ต่ำ
-    และเป็นคำยาวติดกันมาก
-    มักเป็น noise
+    อักขระแปลกเยอะ
+  */
+
+  const noiseRatio =
+    (
+      digitCount +
+      symbolCount
+    ) /
+    Math.max(
+      compact.length,
+      1
+    );
+
+
+  if (
+    confidence < 50 &&
+    noiseRatio > 0.35
+  ) {
+
+    return false;
+
+  }
+
+
+  /*
+    คำยาวติดกันแบบ OCR noise
   */
 
   const words =
@@ -1245,17 +1593,19 @@ function isGoodEnglishLine(
       .filter(Boolean);
 
 
-  const hasLongGarbageWord =
+  const longGarbage =
     words.some(
       word =>
-        word.length >= 16 &&
-        !/[.,!?;:()'"]/.test(word)
+        word.length >= 20 &&
+        !/[.,!?;:()'"\-]/.test(
+          word
+        )
     );
 
 
   if (
-    confidence < 75 &&
-    hasLongGarbageWord
+    confidence < 70 &&
+    longGarbage
   ) {
 
     return false;
@@ -1269,14 +1619,136 @@ function isGoodEnglishLine(
 
 
 /* =========================================================
-   DEDUPLICATE LINES
+   LINE EXTRACTION
+========================================================= */
+
+function extractLines(
+  result,
+  language
+) {
+
+  const output = [];
+
+
+  if (
+    !Array.isArray(
+      result.lines
+    )
+  ) {
+
+    return output;
+
+  }
+
+
+  for (
+    const line
+    of result.lines
+  ) {
+
+    const text =
+      cleanLine(
+        line.text || ""
+      );
+
+
+    if (!text)
+      continue;
+
+
+    const bbox =
+      line.bbox || {};
+
+
+    const item = {
+
+      text,
+
+      language,
+
+      confidence:
+        Number(
+          line.confidence ||
+          result.confidence ||
+          0
+        ),
+
+      x:
+        Number(
+          bbox.x0 || 0
+        ),
+
+      y:
+        Number(
+          bbox.y0 || 0
+        ),
+
+      width:
+        Number(
+          (bbox.x1 || 0) -
+          (bbox.x0 || 0)
+        ),
+
+      height:
+        Number(
+          (bbox.y1 || 0) -
+          (bbox.y0 || 0)
+        )
+
+    };
+
+
+    if (
+      language === "th"
+    ) {
+
+      if (
+        isGoodThaiLine(
+          item
+        )
+      ) {
+
+        output.push(
+          item
+        );
+
+      }
+
+    } else {
+
+      if (
+        isGoodEnglishLine(
+          item
+        )
+      ) {
+
+        output.push(
+          item
+        );
+
+      }
+
+    }
+
+  }
+
+
+  return output;
+
+}
+
+
+/* =========================================================
+   NORMALIZE
 ========================================================= */
 
 function normalizeLine(
   text
 ) {
 
-  return String(text || "")
+  return String(
+    text || ""
+  )
     .toLowerCase()
     .replace(
       /\s+/g,
@@ -1286,6 +1758,10 @@ function normalizeLine(
 
 }
 
+
+/* =========================================================
+   SIMILARITY
+========================================================= */
 
 function lineSimilarity(
   a,
@@ -1355,6 +1831,10 @@ function lineSimilarity(
 }
 
 
+/* =========================================================
+   DEDUPLICATE
+========================================================= */
+
 function deduplicateLines(
   lines
 ) {
@@ -1376,16 +1856,17 @@ function deduplicateLines(
       of unique
     ) {
 
+      /*
+        ถ้าข้อความเหมือนกันมาก
+        ถือว่าเป็นบรรทัดซ้ำ
+      */
+
       if (
         lineSimilarity(
           line.text,
           old.text
         ) >= 0.82
       ) {
-
-        /*
-          เก็บตัวที่ confidence สูงกว่า
-        */
 
         if (
           Number(
@@ -1444,130 +1925,7 @@ function deduplicateLines(
 
 
 /* =========================================================
-   EXTRACT LINES
-========================================================= */
-
-function extractLines(
-  result,
-  language
-) {
-
-  const output = [];
-
-
-  /*
-    สำคัญ:
-    ใช้ data.lines
-    ไม่ใช้ data.text ทั้งก้อน
-  */
-
-  if (
-    Array.isArray(
-      result.lines
-    )
-  ) {
-
-    for (
-      const line
-      of result.lines
-    ) {
-
-      const text =
-        cleanLine(
-          line.text || ""
-        );
-
-
-      if (!text)
-        continue;
-
-
-      const bbox =
-        line.bbox || {};
-
-
-      const item = {
-
-        text,
-
-        language,
-
-        confidence:
-          Number(
-            line.confidence ||
-            result.confidence ||
-            0
-          ),
-
-        x:
-          Number(
-            bbox.x0 || 0
-          ),
-
-        y:
-          Number(
-            bbox.y0 || 0
-          ),
-
-        width:
-          Number(
-            (bbox.x1 || 0) -
-            (bbox.x0 || 0)
-          ),
-
-        height:
-          Number(
-            (bbox.y1 || 0) -
-            (bbox.y0 || 0)
-          )
-
-      };
-
-
-      if (
-        language === "th"
-      ) {
-
-        if (
-          isGoodThaiLine(
-            item
-          )
-        ) {
-
-          output.push(
-            item
-          );
-
-        }
-
-      } else {
-
-        if (
-          isGoodEnglishLine(
-            item
-          )
-        ) {
-
-          output.push(
-            item
-          );
-
-        }
-
-      }
-
-    }
-
-  }
-
-
-  return output;
-
-}
-
-
-/* =========================================================
-   MERGE THAI + ENGLISH
+   MERGE LINES
 ========================================================= */
 
 function mergeLines(
@@ -1590,7 +1948,7 @@ function mergeLines(
 
 
   /*
-    เรียงตามตำแหน่ง Y
+    เรียงตามตำแหน่งจริงของข้อความ
   */
 
   unique.sort(
@@ -1602,11 +1960,11 @@ function mergeLines(
 
       const tolerance =
         Math.max(
-          10,
+          12,
           Math.min(
-            a.height || 20,
-            b.height || 20
-          )
+            a.height || 24,
+            b.height || 24
+          ) * 0.6
         );
 
 
@@ -1633,6 +1991,329 @@ function mergeLines(
     )
     .join("\n")
     .trim();
+
+}
+
+
+/* =========================================================
+   REMOVE OBVIOUS OCR NOISE
+========================================================= */
+
+function removeObviousNoise(
+  text
+) {
+
+  if (!text)
+    return "";
+
+
+  const lines =
+    String(text)
+      .split("\n")
+      .map(
+        line =>
+          line
+            .replace(
+              /\s+/g,
+              " "
+            )
+            .trim()
+      )
+      .filter(Boolean);
+
+
+  const result = [];
+
+
+  for (
+    const line
+    of lines
+  ) {
+
+    const compact =
+      line.replace(
+        /\s/g,
+        ""
+      );
+
+
+    if (!compact)
+      continue;
+
+
+    /*
+      ข้อความอังกฤษที่ดูเป็น noise
+      เช่น ตัวอักษรติดกันยาวมาก
+    */
+
+    const english =
+      (
+        compact.match(
+          /[a-zA-Z]/g
+        ) || []
+      ).length;
+
+
+    const thai =
+      (
+        compact.match(
+          /[ก-๙]/g
+        ) || []
+      ).length;
+
+
+    const digits =
+      (
+        compact.match(
+          /[0-9]/g
+        ) || []
+      ).length;
+
+
+    const letters =
+      english + thai;
+
+
+    /*
+      ตัวอักษรน้อยมาก + ตัวเลขเยอะ
+    */
+
+    if (
+      letters <= 2 &&
+      digits >= 3
+    ) {
+
+      continue;
+
+    }
+
+
+    /*
+      อังกฤษยาวมากแต่แทบไม่มีช่องว่าง
+      มักเป็น noise จากภาพ
+    */
+
+    if (
+      english >= 18 &&
+      !/\s/.test(line) &&
+      thai === 0
+    ) {
+
+      /*
+        ยกเว้นคำที่ดูเป็นประโยคจริง
+        ซึ่งโดยทั่วไปจะมีเครื่องหมาย
+      */
+
+      if (
+        !/[.,!?;:'"\-]/.test(
+          line
+        )
+      ) {
+
+        continue;
+
+      }
+
+    }
+
+
+    result.push(
+      line
+    );
+
+  }
+
+
+  return result.join(
+    "\n"
+  );
+
+}
+
+
+/* =========================================================
+   OCR ONE IMAGE
+========================================================= */
+
+async function runOCRPasses(
+  workers,
+  canvasSet
+) {
+
+  const allThai = [];
+  const allEnglish = [];
+
+
+  /*
+    -----------------------------------------
+    PASS 1
+    ภาพปกติ
+    -----------------------------------------
+  */
+
+  showLoading(
+    "กำลังอ่านภาษาไทย..."
+  );
+
+
+  const thaiBase =
+    await recognizeOCR(
+      workers.thai,
+      canvasSet.base,
+      6
+    );
+
+
+  allThai.push(
+    ...extractLines(
+      thaiBase,
+      "th"
+    )
+  );
+
+
+  showLoading(
+    "กำลังอ่านภาษาอังกฤษ..."
+  );
+
+
+  const englishBase =
+    await recognizeOCR(
+      workers.english,
+      canvasSet.base,
+      6
+    );
+
+
+  allEnglish.push(
+    ...extractLines(
+      englishBase,
+      "en"
+    )
+  );
+
+
+  /*
+    -----------------------------------------
+    PASS 2
+    ภาพปรับ contrast
+    -----------------------------------------
+  */
+
+  showLoading(
+    "กำลังปรับภาพเพื่ออ่านข้อความ..."
+  );
+
+
+  const thaiEnhanced =
+    await recognizeOCR(
+      workers.thai,
+      canvasSet.enhanced,
+      6
+    );
+
+
+  allThai.push(
+    ...extractLines(
+      thaiEnhanced,
+      "th"
+    )
+  );
+
+
+  const englishEnhanced =
+    await recognizeOCR(
+      workers.english,
+      canvasSet.enhanced,
+      6
+    );
+
+
+  allEnglish.push(
+    ...extractLines(
+      englishEnhanced,
+      "en"
+    )
+  );
+
+
+  /*
+    -----------------------------------------
+    PASS 3
+    ภาพ sharpen
+    เฉพาะกรณีที่ยังอ่านได้น้อย
+    -----------------------------------------
+  */
+
+  if (
+    allThai.length === 0 ||
+    allEnglish.length === 0
+  ) {
+
+    showLoading(
+      "กำลังตรวจข้อความเพิ่มเติม..."
+    );
+
+
+    if (
+      allThai.length === 0
+    ) {
+
+      const thaiSharp =
+        await recognizeOCR(
+          workers.thai,
+          canvasSet.sharp,
+          11
+        );
+
+
+      allThai.push(
+        ...extractLines(
+          thaiSharp,
+          "th"
+        )
+      );
+
+    }
+
+
+    if (
+      allEnglish.length === 0
+    ) {
+
+      const englishSharp =
+        await recognizeOCR(
+          workers.english,
+          canvasSet.sharp,
+          11
+        );
+
+
+      allEnglish.push(
+        ...extractLines(
+          englishSharp,
+          "en"
+        )
+      );
+
+    }
+
+  }
+
+
+  return {
+
+    thai:
+      deduplicateLines(
+        allThai
+      ),
+
+    english:
+      deduplicateLines(
+        allEnglish
+      )
+
+  };
 
 }
 
@@ -1691,155 +2372,29 @@ async function runOCR(
     );
 
 
-    const canvas =
-      await prepareOCRImage(
+    const canvasSet =
+      await prepareOCRImages(
         file
       );
 
 
-    /*
-      อ่านไทย
-    */
-
-    showLoading(
-      "กำลังอ่านภาษาไทย..."
-    );
-
-
-    const thaiResult =
-      await recognizeOCR(
-        workers.thai,
-        canvas,
-        6
+    const result =
+      await runOCRPasses(
+        workers,
+        canvasSet
       );
 
 
-    /*
-      อ่านอังกฤษ
-    */
-
-    showLoading(
-      "กำลังอ่านภาษาอังกฤษ..."
-    );
-
-
-    const englishResult =
-      await recognizeOCR(
-        workers.english,
-        canvas,
-        6
-      );
-
-
-    /*
-      ดึงเฉพาะบรรทัดที่ผ่าน filter
-    */
-
-    const thaiLines =
-      extractLines(
-        thaiResult,
-        "th"
-      );
-
-
-    const englishLines =
-      extractLines(
-        englishResult,
-        "en"
-      );
-
-
-    /*
-      ถ้าไม่พบไทยเลย
-      ค่อยใช้ PSM 11 เป็น fallback
-      ไม่ทำทุกครั้ง เพื่อให้เร็ว
-    */
-
-    let extraThaiLines = [];
-
-
-    if (
-      thaiLines.length === 0
-    ) {
-
-      showLoading(
-        "กำลังตรวจภาษาไทยเพิ่มเติม..."
-      );
-
-
-      const thaiFallback =
-        await recognizeOCR(
-          workers.thai,
-          canvas,
-          11
-        );
-
-
-      extraThaiLines =
-        extractLines(
-          thaiFallback,
-          "th"
-        );
-
-    }
-
-
-    /*
-      ถ้าไม่พบอังกฤษเลย
-      ค่อยใช้ PSM 11 เป็น fallback
-    */
-
-    let extraEnglishLines = [];
-
-
-    if (
-      englishLines.length === 0
-    ) {
-
-      showLoading(
-        "กำลังตรวจภาษาอังกฤษเพิ่มเติม..."
-      );
-
-
-      const englishFallback =
-        await recognizeOCR(
-          workers.english,
-          canvas,
-          11
-        );
-
-
-      extraEnglishLines =
-        extractLines(
-          englishFallback,
-          "en"
-        );
-
-    }
-
-
-    /*
-      รวม
-    */
-
-    const finalThaiLines =
-      deduplicateLines([
-        ...thaiLines,
-        ...extraThaiLines
-      ]);
-
-
-    const finalEnglishLines =
-      deduplicateLines([
-        ...englishLines,
-        ...extraEnglishLines
-      ]);
-
-
-    const finalText =
+    let finalText =
       mergeLines(
-        finalThaiLines,
-        finalEnglishLines
+        result.thai,
+        result.english
+      );
+
+
+    finalText =
+      removeObviousNoise(
+        finalText
       );
 
 
@@ -2542,7 +3097,7 @@ if (clearInputButton) {
 
 
 /* =========================================================
-   SWAP
+   SWAP LANGUAGE
 ========================================================= */
 
 if (swapLanguageButton) {
