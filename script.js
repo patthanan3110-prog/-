@@ -3,7 +3,7 @@
    Thai ↔ English
    OCR + Translation
 
-   VERSION 28
+   VERSION 29
 
    จุดแก้หลัก:
    - ใช้ภาพต้นฉบับเป็นหลัก
@@ -22,11 +22,15 @@
    - รองรับ Camera + Gallery
    - ไม่ hardcode รูปตัวอย่าง
 
-   VERSION 28 เพิ่ม:
+   VERSION 28:
    - ตรวจตำแหน่งบรรทัดไทยกับอังกฤษ
-   - ถ้า OCR ภาษาไทยอ่านภาษาอังกฤษซ้ำในตำแหน่งเดียวกัน
-     จะตัดเฉพาะบรรทัดไทยขยะนั้นออก
-   - ไม่ลบบรรทัดไทยจริงที่อยู่คนละตำแหน่ง
+   - ตัด Thai OCR ที่อ่านภาษาอังกฤษซ้ำในตำแหน่งเดียวกัน
+
+   VERSION 29:
+   - แยกข้อความตามภาษาต้นทางก่อนส่งไปแปล
+   - ไทย → อังกฤษ ใช้เฉพาะภาษาไทยจาก OCR
+   - อังกฤษ → ไทย ใช้เฉพาะภาษาอังกฤษจาก OCR
+   - ไม่เอาภาษาปลายทางไปแปลซ้ำ
 ========================================================= */
 
 const API_URL =
@@ -2539,7 +2543,7 @@ function deduplicateLines(
 
 
 /* =========================================================
-   NEW - GEOMETRY HELPERS
+   GEOMETRY HELPERS
 ========================================================= */
 
 function getLineRight(
@@ -2613,23 +2617,8 @@ function getLineBottom(
 
 
 /* =========================================================
-   NEW - CHECK OVERLAPPING LINES
+   CHECK OVERLAPPING LINES
 ========================================================= */
-
-/*
-  ตรวจว่าบรรทัด 2 บรรทัดอยู่บริเวณเดียวกันหรือไม่
-
-  ใช้ bbox เป็นหลัก ไม่ใช้ข้อความ
-  เพราะปัญหาที่เกิดขึ้นคือ
-
-  อังกฤษจริง:
-  You weren't just a star to me,
-
-  ไทย OCR ผิด:
-  ทอนจดลทแรลรลทเอ
-
-  ทั้งสองบรรทัดอยู่ตำแหน่งเดียวกันบนรูป
-*/
 
 function linesOccupySameArea(
   lineA,
@@ -2766,12 +2755,6 @@ function linesOccupySameArea(
     );
 
 
-  /*
-    ถ้าทับกันในแนวตั้งอย่างน้อยครึ่งหนึ่ง
-    และมีพื้นที่ซ้อนกันในแนวนอน
-    ให้ถือว่าอยู่บรรทัดเดียวกัน
-  */
-
   if (
     verticalRatio >= 0.50 &&
     horizontalRatio >= 0.15
@@ -2781,11 +2764,6 @@ function linesOccupySameArea(
 
   }
 
-
-  /*
-    กรณี bbox จาก Tesseract เล็ก/เพี้ยน
-    ให้ดูจุดกึ่งกลางของบรรทัดด้วย
-  */
 
   const centerAY =
     (ay0 + ay1) / 2;
@@ -2853,24 +2831,8 @@ function linesOccupySameArea(
 
 
 /* =========================================================
-   NEW - DETECT THAI OCR DUPLICATE OF ENGLISH
+   DETECT THAI OCR DUPLICATE OF ENGLISH
 ========================================================= */
-
-/*
-  ภาษาไทยจริงในรูปตัวอย่างอยู่คนละบรรทัดกับอังกฤษ
-
-  อังกฤษ:
-  You weren't just a star to me,
-
-  ไทยจริง:
-  เธอไม่ได้เป็นแค่เพียงดวงดาวสำหรับฉัน
-
-  แต่ภาษาไทย worker อ่านอังกฤษซ้ำออกมาเป็น:
-  ทอนจดลทแรลรลทเอ
-
-  ดังนั้นถ้า Thai line กับ English line
-  อยู่พื้นที่เดียวกัน จะตัด Thai line ทิ้ง
-*/
 
 function isThaiOCRDuplicateOfEnglish(
   thaiLine,
@@ -2921,11 +2883,6 @@ function isThaiOCRDuplicateOfEnglish(
     );
 
 
-  /*
-    ต้องเป็นข้อความที่เป็นไทยจริง
-    ไม่ใช่ line ที่มีอังกฤษปนอยู่เยอะ
-  */
-
   if (
     thaiCount < 3
   ) {
@@ -2970,7 +2927,7 @@ function isThaiOCRDuplicateOfEnglish(
 
 
 /* =========================================================
-   NEW - REMOVE OVERLAPPING THAI OCR
+   REMOVE OVERLAPPING THAI OCR
 ========================================================= */
 
 function removeOverlappingThaiOCR(
@@ -3015,11 +2972,6 @@ function removeOverlappingThaiOCR(
         englishLines
       )
     ) {
-
-      /*
-        ไม่เอา line นี้
-        เพราะเป็นภาษาอังกฤษที่ Thai OCR อ่านซ้ำ
-      */
 
       console.log(
         "ตัด Thai OCR duplicate:",
@@ -3496,12 +3448,6 @@ function mergeLines(
   englishLines
 ) {
 
-  /*
-    VERSION 28
-    ตัดเฉพาะภาษาไทยที่ OCR อ่านภาษาอังกฤษซ้ำ
-    โดยดูจากตำแหน่ง bbox
-  */
-
   thaiLines =
     removeOverlappingThaiOCR(
       thaiLines,
@@ -3781,10 +3727,6 @@ async function runOCR(
       );
 
 
-    /*
-      PASS 1
-    */
-
     showLoading(
       "กำลังอ่านข้อความภาษาไทย..."
     );
@@ -3824,10 +3766,6 @@ async function runOCR(
         "en"
       );
 
-
-    /*
-      PASS 2
-    */
 
     if (
       thaiLines.length === 0
@@ -4094,6 +4032,270 @@ if (speakOcrButton) {
 
 
 /* =========================================================
+   NEW VERSION 29
+   PREPARE TEXT FOR TRANSLATION
+========================================================= */
+
+/*
+  OCR ของรูปอาจมีทั้ง 2 ภาษา เช่น
+
+  It's only you
+  คุณคนเดียวเท่านั้น
+  who can save you.
+  ที่จะช่วยเหลือตัวคุณเองได้
+
+  ถ้าแปลจากไทย → อังกฤษ
+  ต้องส่งเฉพาะ:
+
+  คุณคนเดียวเท่านั้น
+  ที่จะช่วยเหลือตัวคุณเองได้
+
+  ไม่ควรส่งภาษาอังกฤษที่อยู่ในรูปไปแปลซ้ำ
+*/
+
+
+function extractSourceLanguageText(
+  text,
+  language
+) {
+
+  if (!text)
+    return "";
+
+
+  const lines =
+    String(text)
+      .replace(
+        /\r/g,
+        ""
+      )
+      .split("\n")
+      .map(
+        line =>
+          cleanText(
+            line
+          )
+      )
+      .filter(Boolean);
+
+
+  if (
+    lines.length === 0
+  ) {
+
+    return "";
+
+  }
+
+
+  const sourceLines = [];
+
+
+  for (
+    const line
+    of lines
+  ) {
+
+    const thai =
+      countThai(
+        line
+      );
+
+
+    const english =
+      countEnglish(
+        line
+      );
+
+
+    const digits =
+      countDigits(
+        line
+      );
+
+
+    if (
+      language === "th"
+    ) {
+
+      /*
+        ต้องมีภาษาไทยมากกว่าภาษาอังกฤษ
+        จึงถือว่าเป็นข้อความภาษาไทย
+      */
+
+      if (
+        thai > 0 &&
+        thai >= english
+      ) {
+
+        let value =
+          line;
+
+
+        value =
+          normalizeThaiText(
+            value
+          );
+
+
+        /*
+          ถ้ามีตัวเลข/อักขระแปลก ๆ
+          แต่ยังเป็นไทย ให้ตัดเฉพาะตัวเลขออก
+        */
+
+        if (
+          digits > 0
+        ) {
+
+          value =
+            value.replace(
+              /[0-9๐-๙]/g,
+              ""
+            );
+
+        }
+
+
+        value =
+          value.trim();
+
+
+        if (value) {
+
+          sourceLines.push(
+            value
+          );
+
+        }
+
+      }
+
+    } else {
+
+      /*
+        English source
+        ต้องมีภาษาอังกฤษมากกว่าภาษาไทย
+      */
+
+      if (
+        english > 0 &&
+        english >= thai
+      ) {
+
+        let value =
+          line;
+
+
+        value =
+          value.replace(
+            /[๐-๙]/g,
+            ""
+          );
+
+
+        value =
+          value.trim();
+
+
+        if (value) {
+
+          sourceLines.push(
+            value
+          );
+
+        }
+
+      }
+
+    }
+
+  }
+
+
+  /*
+    ถ้าหา source language ไม่เจอ
+    ให้ fallback เป็นข้อความเดิม
+    เพื่อไม่ทำให้ระบบแปลพัง
+  */
+
+  if (
+    sourceLines.length === 0
+  ) {
+
+    return cleanText(
+      text
+    );
+
+  }
+
+
+  return sourceLines.join(
+    "\n"
+  );
+
+}
+
+
+/* =========================================================
+   PREPARE TRANSLATION TEXT
+========================================================= */
+
+function prepareTranslationText(
+  text
+) {
+
+  const value =
+    String(
+      text || ""
+    ).trim();
+
+
+  if (!value)
+    return "";
+
+
+  const thaiCount =
+    countThai(
+      value
+    );
+
+
+  const englishCount =
+    countEnglish(
+      value
+    );
+
+
+  /*
+    ถ้ามีทั้งไทยและอังกฤษ
+    ถือว่าเป็นข้อความจาก OCR
+    และเลือกเฉพาะภาษาต้นทาง
+  */
+
+  if (
+    thaiCount > 0 &&
+    englishCount > 0
+  ) {
+
+    return extractSourceLanguageText(
+      value,
+      sourceLanguage
+    );
+
+  }
+
+
+  /*
+    ถ้ามีภาษาเดียว
+    ส่งไปแปลตามปกติ
+  */
+
+  return value;
+
+}
+
+
+/* =========================================================
    TRANSLATE
 ========================================================= */
 
@@ -4113,13 +4315,13 @@ async function translateText() {
     return;
 
 
-  const text =
+  const originalText =
     inputText
       ? inputText.value.trim()
       : "";
 
 
-  if (!text) {
+  if (!originalText) {
 
     showStatus(
       "กรุณาพิมพ์ข้อความก่อนแปล",
@@ -4127,6 +4329,46 @@ async function translateText() {
     );
 
     return;
+
+  }
+
+
+  /*
+    VERSION 29
+    แยกภาษาต้นทางออกจาก OCR
+  */
+
+  const text =
+    prepareTranslationText(
+      originalText
+    );
+
+
+  if (!text) {
+
+    showStatus(
+      "ไม่พบข้อความภาษาต้นทางสำหรับแปล",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  /*
+    ถ้ามีการกรองภาษาออก
+    แสดงเฉพาะข้อความต้นทางในช่อง input
+    เพื่อให้ผู้ใช้เห็นว่าระบบกำลังแปลอะไร
+  */
+
+  if (
+    text !== originalText &&
+    inputText
+  ) {
+
+    inputText.value =
+      text;
 
   }
 
