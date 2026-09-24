@@ -3,15 +3,15 @@
    Thai ↔ English
    OCR + Translation
 
-   VERSION 40
+   VERSION 41
 
    OCR:
    - Thai / English แยก Worker
    - อ่านหลาย pass
-   - เลือกข้อความที่มีความเสถียร
-   - ไม่รวม hallucination แบบเดิม
-   - รักษาบรรทัดและคำที่ OCR อ่านได้
-   - รองรับไทย + อังกฤษในภาพเดียวกัน
+   - เลือกผลตามตำแหน่งจริงของบรรทัด
+   - ป้องกัน hallucination คนละภาษาซ้อนกัน
+   - ลดการรวมผล OCR ที่ไม่ใช่ข้อความเดียวกัน
+   - รักษาบรรทัดจริง
 ========================================================= */
 
 
@@ -978,6 +978,119 @@ async function prepareOCRImage(
 
 
 /* =========================================================
+   ENHANCED IMAGE
+========================================================= */
+
+function createEnhancedCanvas(
+  sourceCanvas
+) {
+
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
+
+  canvas.width =
+    sourceCanvas.width;
+
+  canvas.height =
+    sourceCanvas.height;
+
+  const sourceCtx =
+    sourceCanvas.getContext(
+      "2d",
+      {
+        willReadFrequently:
+          true
+      }
+    );
+
+  const ctx =
+    canvas.getContext(
+      "2d",
+      {
+        willReadFrequently:
+          true
+      }
+    );
+
+  if (
+    !sourceCtx ||
+    !ctx
+  ) {
+
+    return sourceCanvas;
+
+  }
+
+  const imageData =
+    sourceCtx.getImageData(
+      0,
+      0,
+      sourceCanvas.width,
+      sourceCanvas.height
+    );
+
+  const data =
+    imageData.data;
+
+  for (
+    let i = 0;
+    i < data.length;
+    i += 4
+  ) {
+
+    const r =
+      data[i];
+
+    const g =
+      data[i + 1];
+
+    const b =
+      data[i + 2];
+
+    const gray =
+      0.299 * r +
+      0.587 * g +
+      0.114 * b;
+
+    const contrast =
+      (
+        gray - 128
+      ) * 1.18 + 128;
+
+    const value =
+      Math.max(
+        0,
+        Math.min(
+          255,
+          contrast
+        )
+      );
+
+    data[i] =
+      value;
+
+    data[i + 1] =
+      value;
+
+    data[i + 2] =
+      value;
+
+  }
+
+  ctx.putImageData(
+    imageData,
+    0,
+    0
+  );
+
+  return canvas;
+
+}
+
+
+/* =========================================================
    TEXT
 ========================================================= */
 
@@ -1216,13 +1329,6 @@ function looksLikeEnglishGibberish(
       .split(/\s+/)
       .filter(Boolean);
 
-  /*
-    อย่าตัดคำสั้นหรือประโยคปกติ
-    เช่น:
-    It's only you
-    who can save you.
-  */
-
   if (
     words.length >= 2
   ) {
@@ -1322,18 +1428,9 @@ function looksLikeThaiGibberish(
     );
 
   /*
-    ลดความเข้มจาก Version 39
-    เพื่อไม่ให้ตัดข้อความไทยจริง
+    ไม่ใช้ markRatio เป็นตัวตัดหลัก
+    เพราะภาษาไทยจริงบางประโยคมีสระ/วรรณยุกต์น้อย
   */
-
-  if (
-    thai >= 18 &&
-    markRatio < 0.035
-  ) {
-
-    return true;
-
-  }
 
   const digits =
     countDigits(
@@ -1343,6 +1440,36 @@ function looksLikeThaiGibberish(
   if (
     digits >= 4 &&
     digits >= thai * 0.45
+  ) {
+
+    return true;
+
+  }
+
+  if (
+    /(.)\1{4,}/.test(
+      value
+    )
+  ) {
+
+    return true;
+
+  }
+
+  /*
+    กลุ่มอักขระแปลก ๆ จำนวนมาก
+  */
+
+  const strange =
+    (
+      value.match(
+        /[^ก-๙\s0-9๐-๙]/g
+      ) || []
+    ).length;
+
+  if (
+    strange >= 3 &&
+    strange >= thai * 0.25
   ) {
 
     return true;
@@ -1486,10 +1613,16 @@ function getLineQuality(
       )
     );
 
+  /*
+    Word confidence สำคัญกว่า
+    เพราะ line confidence ของ hallucination
+    บางครั้งสูงผิดปกติ
+  */
+
   return (
-    confidence * 0.45 +
-    wordConfidence * 0.40 +
-    expected * 100 * 0.15
+    confidence * 0.30 +
+    wordConfidence * 0.50 +
+    expected * 100 * 0.20
   );
 
 }
@@ -1736,21 +1869,13 @@ function extractOCRLines(
         text
       );
 
-    /*
-      Worker ภาษาไทย:
-      ต้องเป็นไทยจริงเป็นหลัก
-
-      Worker ภาษาอังกฤษ:
-      ต้องเป็นอังกฤษจริงเป็นหลัก
-    */
-
     if (
       language === "th"
     ) {
 
       if (
         thai < 2 ||
-        ratio.thai < 0.68
+        ratio.thai < 0.72
       ) {
 
         continue;
@@ -1761,7 +1886,7 @@ function extractOCRLines(
 
       if (
         english < 2 ||
-        ratio.english < 0.68
+        ratio.english < 0.72
       ) {
 
         continue;
@@ -1888,7 +2013,7 @@ function sameTextRegion(
 
   const aHeight =
     Math.max(
-      12,
+      10,
       Number(
         a.height || 20
       )
@@ -1896,7 +2021,7 @@ function sameTextRegion(
 
   const bHeight =
     Math.max(
-      12,
+      10,
       Number(
         b.height || 20
       )
@@ -1915,13 +2040,13 @@ function sameTextRegion(
     );
 
   /*
-    OCR สองรอบอาจวัดตำแหน่งไม่เท่ากัน
-    จึงให้ระยะค่อนข้างกว้าง
+    ต้องอยู่ในแนวเดียวกันจริง ๆ
+    ไม่รวมบรรทัดบน/ล่างเข้ากลุ่มเดียวกันง่ายเกินไป
   */
 
   if (
     verticalDistance >
-    referenceHeight * 0.75
+    referenceHeight * 0.55
   ) {
 
     return false;
@@ -1961,8 +2086,8 @@ function sameTextRegion(
   return (
     gap <=
     Math.max(
-      80,
-      referenceHeight * 2.5
+      45,
+      referenceHeight * 1.5
     )
   );
 
@@ -2034,7 +2159,7 @@ function lineSimilarity(
 
 
 /* =========================================================
-   MERGE OCR CANDIDATES
+   GROUP CANDIDATES
 ========================================================= */
 
 function mergeCandidateLines(
@@ -2043,21 +2168,58 @@ function mergeCandidateLines(
 
   const groups = [];
 
+  /*
+    เรียงตามตำแหน่งก่อน
+    เพื่อไม่ให้ candidate จากคนละบริเวณ
+    ไปจับกลุ่มกัน
+  */
+
+  const sorted =
+    [...allCandidates].sort(
+      (a, b) => {
+
+        const ay =
+          Number(a.y || 0);
+
+        const by =
+          Number(b.y || 0);
+
+        if (
+          Math.abs(
+            ay - by
+          ) < 5
+        ) {
+
+          return (
+            Number(a.x || 0) -
+            Number(b.x || 0)
+          );
+
+        }
+
+        return ay - by;
+
+      }
+    );
+
   for (
     const candidate
-    of allCandidates
+    of sorted
   ) {
 
-    let group =
+    let bestGroup =
       null;
 
+    let bestSimilarity =
+      0;
+
     for (
-      const existing
+      const group
       of groups
     ) {
 
       const representative =
-        existing[0];
+        group[0];
 
       if (
         representative.language !==
@@ -2086,32 +2248,28 @@ function mergeCandidateLines(
         );
 
       /*
-        0.35 เพื่อให้
-        "It's on"
-        กับ
-        "It's only you"
-        อยู่กลุ่มเดียวกันได้
-        แล้วเลือกเวอร์ชันที่ครบกว่า
+        ต้องมีความคล้ายกันจริง
+        ไม่ใช้ความยาวอย่างเดียวแล้ว
       */
 
       if (
-        similarity >= 0.35 ||
-        representative.text.length >=
-          candidate.text.length * 0.55
+        similarity >= 0.45 &&
+        similarity > bestSimilarity
       ) {
 
-        group =
-          existing;
+        bestGroup =
+          group;
 
-        break;
+        bestSimilarity =
+          similarity;
 
       }
 
     }
 
-    if (group) {
+    if (bestGroup) {
 
-      group.push(
+      bestGroup.push(
         candidate
       );
 
@@ -2141,16 +2299,14 @@ function chooseBestFromGroup(
   if (!group.length)
     return null;
 
-  /*
-    นับว่าข้อความแต่ละ candidate
-    ปรากฏในกี่ pass
-  */
-
   const scored =
     group.map(
       candidate => {
 
         let support =
+          0;
+
+        let similaritySupport =
           0;
 
         for (
@@ -2167,22 +2323,23 @@ function chooseBestFromGroup(
 
           }
 
-          if (
+          const similarity =
             lineSimilarity(
               candidate.text,
               other.text
-            ) >= 0.45
+            );
+
+          if (
+            similarity >= 0.45
           ) {
 
             support++;
+            similaritySupport +=
+              similarity;
 
           }
 
         }
-
-        /*
-          ความครบของข้อความ
-        */
 
         const length =
           candidate.text
@@ -2199,12 +2356,12 @@ function chooseBestFromGroup(
 
         let score =
           quality +
-          support * 18;
+          support * 12 +
+          similaritySupport * 8;
 
         /*
-          ถ้า text ยาวกว่าเล็กน้อย
-          และ confidence ไม่แย่
-          ให้โอกาสข้อความที่ครบกว่า
+          ให้ข้อความที่ยาวกว่าได้คะแนนเพิ่ม
+          แต่ไม่มากจนชนะข้อความมั่ว
         */
 
         if (
@@ -2213,16 +2370,15 @@ function chooseBestFromGroup(
 
           score +=
             Math.min(
-              12,
-              length * 0.12
+              10,
+              length * 0.10
             );
 
         }
 
         /*
-          ประโยคภาษาอังกฤษหลายคำ
-          ไม่ควรแพ้คำสั้นเพียงเพราะ
-          confidence ต่างกันเล็กน้อย
+          ภาษาอังกฤษหลายคำ
+          มีโอกาสเป็นประโยคจริง
         */
 
         if (
@@ -2232,7 +2388,7 @@ function chooseBestFromGroup(
             .length >= 2
         ) {
 
-          score += 4;
+          score += 5;
 
         }
 
@@ -2251,37 +2407,47 @@ function chooseBestFromGroup(
       b
     ) => {
 
-      /*
-        ถ้าข้อความหนึ่งยาวกว่าอีกข้อความมาก
-        แต่ quality ไม่ต่างกันมาก
-        ให้ข้อความยาวกว่า
-      */
-
       const aLength =
         a.candidate.text
-          .replace(/\s/g, "")
+          .replace(
+            /\s/g,
+            ""
+          )
           .length;
 
       const bLength =
         b.candidate.text
-          .replace(/\s/g, "")
+          .replace(
+            /\s/g,
+            ""
+          )
           .length;
+
+      /*
+        ถ้า quality ใกล้กันมาก
+        เลือกข้อความที่ครบกว่า
+      */
 
       if (
         Math.abs(
           a.score -
           b.score
-        ) < 8 &&
-        Math.abs(
-          aLength -
-          bLength
-        ) >= 4
+        ) < 6
       ) {
 
-        return (
-          bLength -
-          aLength
-        );
+        if (
+          Math.abs(
+            aLength -
+            bLength
+          ) >= 4
+        ) {
+
+          return (
+            bLength -
+            aLength
+          );
+
+        }
 
       }
 
@@ -2341,13 +2507,13 @@ function selectFinalLines(
       );
 
     /*
-      ถ้าเจอหลายรอบ
-      ให้ผ่านง่ายขึ้น
+      ถ้าเจอหลาย pass
+      และคุณภาพพอใช้
     */
 
     if (
       support >= 2 &&
-      quality >= 42
+      quality >= 45
     ) {
 
       selected.push(
@@ -2359,29 +2525,27 @@ function selectFinalLines(
     }
 
     /*
-      ถ้าเจอครั้งเดียว
-      ต้อง confidence ดี
+      เจอครั้งเดียว
+      ต้องมั่นใจมาก
     */
 
     if (
       support === 1 &&
-      quality >= 68
+      quality >= 72
     ) {
 
       selected.push(
         best
       );
 
-      continue;
-
     }
 
   }
 
-  /*
-    ป้องกันภาษาไทย hallucination
-    ที่อยู่ตำแหน่งเดียวกับอังกฤษ
-  */
+
+  /* =======================================================
+     REMOVE CROSS-LANGUAGE OVERLAP
+  ======================================================= */
 
   const final = [];
 
@@ -2390,7 +2554,11 @@ function selectFinalLines(
     of selected
   ) {
 
-    let keep = true;
+    let replaced =
+      false;
+
+    let discarded =
+      false;
 
     for (
       let i = 0;
@@ -2421,21 +2589,6 @@ function selectFinalLines(
 
       }
 
-      /*
-        ถ้าคนละภาษาแต่ทั้งคู่
-        อ่านได้หลาย pass
-        อาจเป็นภาพสองภาษาอยู่บรรทัดใกล้กัน
-      */
-
-      if (
-        old.support >= 2 &&
-        candidate.support >= 2
-      ) {
-
-        continue;
-
-      }
-
       const oldQuality =
         getLineQuality(
           old
@@ -2446,28 +2599,33 @@ function selectFinalLines(
           candidate
         );
 
+      const oldLength =
+        old.text
+          .replace(
+            /\s/g,
+            ""
+          )
+          .length;
+
+      const newLength =
+        candidate.text
+          .replace(
+            /\s/g,
+            ""
+          )
+          .length;
+
       /*
-        ภาษาไทย hallucination
-        มัก confidence ต่ำกว่า
+        สำคัญมาก:
+        ถ้าสองภาษาอยู่ "ตำแหน่งเดียวกัน"
+        ให้เลือกตัวที่มีคุณภาพสูงกว่า
+        ไม่ปล่อยทั้งสองตัวผ่านเพียงเพราะ
+        support >= 2
       */
 
       if (
-        candidate.language === "th" &&
-        old.language === "en" &&
-        oldQuality >=
-          newQuality + 8
-      ) {
-
-        keep = false;
-        break;
-
-      }
-
-      if (
-        candidate.language === "en" &&
-        old.language === "th" &&
-        newQuality >=
-          oldQuality + 8
+        newQuality >
+        oldQuality + 5
       ) {
 
         final.splice(
@@ -2477,11 +2635,135 @@ function selectFinalLines(
 
         i--;
 
+        replaced =
+          true;
+
+        continue;
+
+      }
+
+      if (
+        oldQuality >
+        newQuality + 5
+      ) {
+
+        discarded =
+          true;
+
+        break;
+
+      }
+
+      /*
+        ถ้าคะแนนใกล้กัน
+        ดูความยาวและ confidence
+      */
+
+      if (
+        newLength >
+          oldLength * 1.20 &&
+        newQuality >=
+          oldQuality - 4
+      ) {
+
+        final.splice(
+          i,
+          1
+        );
+
+        i--;
+
+        replaced =
+          true;
+
+        continue;
+
+      }
+
+      if (
+        oldLength >
+          newLength * 1.20 &&
+        oldQuality >=
+          newQuality - 4
+      ) {
+
+        discarded =
+          true;
+
+        break;
+
+      }
+
+      /*
+        กรณีคะแนนใกล้กันมากจริง ๆ
+        ใช้ word confidence
+      */
+
+      const oldWord =
+        Number(
+          old.wordConfidence ||
+          0
+        );
+
+      const newWord =
+        Number(
+          candidate.wordConfidence ||
+          0
+        );
+
+      if (
+        newWord >
+        oldWord + 4
+      ) {
+
+        final.splice(
+          i,
+          1
+        );
+
+        i--;
+
+        replaced =
+          true;
+
+      } else {
+
+        discarded =
+          true;
+
+        break;
+
       }
 
     }
 
-    if (keep) {
+    if (
+      discarded
+    ) {
+
+      continue;
+
+    }
+
+    /*
+      ถ้าไม่ได้แทนตัวเก่า
+      ให้เพิ่มเข้าไป
+    */
+
+    if (
+      !replaced
+    ) {
+
+      final.push(
+        candidate
+      );
+
+    } else {
+
+      /*
+        ถ้าแทนตัวเก่าแล้ว
+        candidate ยังต้องถูกเพิ่ม
+      */
 
       final.push(
         candidate
@@ -2491,11 +2773,95 @@ function selectFinalLines(
 
   }
 
-  /*
-    เรียงตำแหน่งบนลงล่าง
-  */
 
-  final.sort(
+  /* =======================================================
+     REMOVE DUPLICATE SAME LANGUAGE
+  ======================================================= */
+
+  const unique = [];
+
+  for (
+    const candidate
+    of final
+  ) {
+
+    let duplicate =
+      false;
+
+    for (
+      const old
+      of unique
+    ) {
+
+      if (
+        old.language !==
+        candidate.language
+      ) {
+
+        continue;
+
+      }
+
+      if (
+        lineSimilarity(
+          old.text,
+          candidate.text
+        ) >= 0.80 &&
+        sameTextRegion(
+          old,
+          candidate
+        )
+      ) {
+
+        duplicate =
+          true;
+
+        /*
+          ถ้าตัวใหม่คุณภาพดีกว่า
+          ให้แทนตัวเก่า
+        */
+
+        if (
+          getLineQuality(
+            candidate
+          ) >
+          getLineQuality(
+            old
+          )
+        ) {
+
+          const index =
+            unique.indexOf(
+              old
+            );
+
+          unique[index] =
+            candidate;
+
+        }
+
+        break;
+
+      }
+
+    }
+
+    if (!duplicate) {
+
+      unique.push(
+        candidate
+      );
+
+    }
+
+  }
+
+
+  /* =======================================================
+     SORT
+  ======================================================= */
+
+  unique.sort(
     (
       a,
       b
@@ -2511,21 +2877,27 @@ function selectFinalLines(
           b.y || 0
         );
 
-      const h =
-        Math.min(
-          Number(
-            a.height || 20
-          ),
-          Number(
-            b.height || 20
-          )
+      const ah =
+        Number(
+          a.height || 20
         );
+
+      const bh =
+        Number(
+          b.height || 20
+        );
+
+      const threshold =
+        Math.min(
+          ah,
+          bh
+        ) * 0.50;
 
       if (
         Math.abs(
           ay - by
         ) <=
-        h * 0.7
+        threshold
       ) {
 
         return (
@@ -2544,7 +2916,7 @@ function selectFinalLines(
     }
   );
 
-  return final;
+  return unique;
 
 }
 
@@ -2580,12 +2952,6 @@ function buildOCRText(
     if (!text)
       continue;
 
-    /*
-      อย่าตัดประโยคที่มีหลายคำ
-      เพราะ OCR อาจอ่านได้ไม่เหมือนกัน
-      ในแต่ละ pass
-    */
-
     if (
       line.language === "en"
     ) {
@@ -2608,25 +2974,11 @@ function buildOCRText(
         )
       ) {
 
-        /*
-          ใช้เฉพาะกรณีมั่วชัดเจน
-        */
-
-        if (
-          line.support < 2
-        ) {
-
-          continue;
-
-        }
+        continue;
 
       }
 
     }
-
-    /*
-      กัน duplicate
-    */
 
     let duplicate =
       false;
@@ -2640,10 +2992,11 @@ function buildOCRText(
         lineSimilarity(
           old,
           text
-        ) >= 0.90
+        ) >= 0.85
       ) {
 
-        duplicate = true;
+        duplicate =
+          true;
 
         break;
 
@@ -2834,7 +3187,6 @@ async function runOCR(
 
     /* =====================================================
        PASS 2
-       ขยายภาพ
     ===================================================== */
 
     showLoading(
@@ -2870,7 +3222,6 @@ async function runOCR(
 
     /* =====================================================
        PASS 3
-       ใช้เมื่อผลยังสั้น
     ===================================================== */
 
     if (
@@ -2912,7 +3263,6 @@ async function runOCR(
 
     /* =====================================================
        PASS 4
-       Contrast
     ===================================================== */
 
     if (
@@ -2974,12 +3324,6 @@ async function runOCR(
         .filter(
           line =>
             !looksLikeOCRNoise(
-              line
-            )
-        )
-        .filter(
-          line =>
-            !looksLikeEnglishGibberish(
               line
             )
         )
@@ -4009,5 +4353,5 @@ window.addEventListener(
 
 
 /* =========================================================
-   VERSION 40 END
+   VERSION 41 END
 ========================================================= */
