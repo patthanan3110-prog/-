@@ -699,10 +699,6 @@ async function prepareOCRImage(
 
   /* =====================================
      WIDE FOCUS CROP
-
-     เดิมเริ่มที่ 25%
-     ปรับเป็น 8%
-     เพื่อไม่ตัดข้อความด้านบน
   ===================================== */
 
   if (
@@ -787,8 +783,6 @@ async function prepareOCRImage(
 
   /* =====================================
      LOWER CROP
-
-     ใช้สำหรับข้อความบริเวณกลาง-ล่าง
   ===================================== */
 
   if (
@@ -1245,6 +1239,9 @@ async function recognizeOCR(
 
 /* =========================================
    SCORE OCR
+   ปรับใหม่:
+   ให้จำนวนบรรทัดและจำนวนตัวอักษร
+   สำคัญกว่า confidence
 ========================================= */
 
 function scoreOCRResult(
@@ -1262,8 +1259,21 @@ function scoreOCRResult(
 
 
   const text =
-    result.text.trim();
+    String(
+      result.text
+    ).trim();
 
+
+  if (!text) {
+
+    return -999;
+
+  }
+
+
+  /* =====================================
+     นับตัวอักษรที่ใช้ได้
+  ===================================== */
 
   const useful =
     text.match(
@@ -1286,6 +1296,39 @@ function scoreOCRResult(
   }
 
 
+  /* =====================================
+     นับบรรทัด
+  ===================================== */
+
+  const lines =
+    text
+      .split(/\n+/)
+      .map(
+        function(line) {
+
+          return line.trim();
+
+        }
+      )
+      .filter(
+        function(line) {
+
+          return /[ก-๙a-zA-Z0-9]/.test(
+            line
+          );
+
+        }
+      );
+
+
+  const lineCount =
+    lines.length;
+
+
+  /* =====================================
+     ภาษาไทย
+  ===================================== */
+
   const thai =
     text.match(
       /[ก-๙]/g
@@ -1297,6 +1340,10 @@ function scoreOCRResult(
       ? thai.length
       : 0;
 
+
+  /* =====================================
+     ภาษาอังกฤษ
+  ===================================== */
 
   const english =
     text.match(
@@ -1310,18 +1357,9 @@ function scoreOCRResult(
       : 0;
 
 
-  const total =
-    text.replace(
-      /\s/g,
-      ""
-    ).length;
-
-
-  const ratio =
-    total > 0
-      ? usefulCount / total
-      : 0;
-
+  /* =====================================
+     CONFIDENCE
+  ===================================== */
 
   const confidence =
     Number(
@@ -1329,19 +1367,52 @@ function scoreOCRResult(
     ) || 0;
 
 
-  let score =
-    confidence * 0.40;
+  /* =====================================
+     SCORE
 
+     สำคัญ:
+     จำนวนบรรทัด > จำนวนตัวอักษร
+     > confidence
+
+     เพื่อป้องกันกรณี
+     OCR อ่านได้ 3 บรรทัด
+     แต่ confidence สูงกว่า
+     ผลที่อ่านได้ครบ 4 บรรทัด
+  ===================================== */
+
+  let score = 0;
+
+
+  /* จำนวนบรรทัด */
 
   score +=
-    ratio * 40;
+    lineCount * 18;
 
+
+  /* จำนวนตัวอักษร */
+
+  score +=
+    Math.min(
+      usefulCount,
+      100
+    ) * 0.8;
+
+
+  /* confidence เป็นคะแนนเสริม */
+
+  score +=
+    confidence * 0.15;
+
+
+  /* =====================================
+     ภาษาไทย
+  ===================================== */
 
   if (
     thaiCount >= 5
   ) {
 
-    score += 10;
+    score += 5;
 
   }
 
@@ -1355,32 +1426,61 @@ function scoreOCRResult(
   }
 
 
+  /* =====================================
+     ภาษาอังกฤษ
+  ===================================== */
+
   if (
     englishCount >= 5
   ) {
 
-    score += 5;
+    score += 4;
 
   }
 
 
-  if (
-    usefulCount >= 15
-  ) {
+  /* =====================================
+     GARBAGE LINES
+  ===================================== */
 
-    score += 5;
+  let garbageLines =
+    0;
 
-  }
+
+  lines.forEach(
+    function(line) {
+
+      const usefulLine =
+        line.match(
+          /[ก-๙a-zA-Z0-9]/g
+        );
 
 
-  if (
-    usefulCount >= 30
-  ) {
+      const count =
+        usefulLine
+          ? usefulLine.length
+          : 0;
 
-    score += 5;
 
-  }
+      if (
+        count <= 1
+      ) {
 
+        garbageLines++;
+
+      }
+
+    }
+  );
+
+
+  score -=
+    garbageLines * 5;
+
+
+  /* =====================================
+     LONG ENGLISH
+  ===================================== */
 
   const longEnglish =
     text.match(
@@ -1398,6 +1498,10 @@ function scoreOCRResult(
   }
 
 
+  /* =====================================
+     STRANGE CHARACTERS
+  ===================================== */
+
   const strange =
     text.match(
       /[^ก-๙a-zA-Z0-9\s.,!?()\-:/'%&+]/g
@@ -1410,11 +1514,36 @@ function scoreOCRResult(
 
     score -=
       Math.min(
-        20,
-        strange.length * 0.7
+        15,
+        strange.length * 0.5
       );
 
   }
+
+
+  console.log(
+    "OCR DETAIL SCORE:",
+    result.mode,
+    {
+      lines:
+        lineCount,
+
+      useful:
+        usefulCount,
+
+      thai:
+        thaiCount,
+
+      english:
+        englishCount,
+
+      confidence:
+        confidence,
+
+      score:
+        score
+    }
+  );
 
 
   return score;
@@ -2210,9 +2339,6 @@ async function runOCR(
     /* =====================================
        PASS 6
        FULL IMAGE + PSM 6
-
-       เพิ่มรอบนี้เพื่อไม่ให้บรรทัดบนสุด
-       หายไปจากการเลือกผล OCR
     ===================================== */
 
     ocrText.value =
