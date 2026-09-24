@@ -3,7 +3,7 @@
    Thai ↔ English
    OCR + Translation
 
-   VERSION 25
+   VERSION 26
 
    จุดแก้หลัก:
    - ใช้ภาพต้นฉบับเป็นหลัก
@@ -16,6 +16,9 @@
    - กรองคำอังกฤษยาวติดกันแบบ noise
    - กรองตัวอักษรอังกฤษสลับพิมพ์ใหญ่/เล็กผิดธรรมชาติ
    - กรองบรรทัดไทยที่มีตัวเลข/สัญลักษณ์ผิดปกติ
+   - แก้ภาษาไทยที่ OCR แยกตัวอักษรออกจากกัน
+   - รวมชิ้นภาษาไทยกลับเป็นคำ/ประโยค
+   - ลดช่องว่างที่เกิดจาก OCR ภาษาไทย
    - รองรับ Camera + Gallery
    - ไม่ hardcode รูปตัวอย่าง
 ========================================================= */
@@ -1174,10 +1177,6 @@ function englishWordLooksReal(
     ).size;
 
 
-  /*
-    คำอังกฤษสั้น ๆ จริง
-  */
-
   if (
     letters <= 4
   ) {
@@ -1190,10 +1189,6 @@ function englishWordLooksReal(
   }
 
 
-  /*
-    คำยาวแต่ไม่มีสระ
-  */
-
   if (
     letters >= 7 &&
     vowels === 0 &&
@@ -1204,10 +1199,6 @@ function englishWordLooksReal(
 
   }
 
-
-  /*
-    ตัวซ้ำติดกันผิดธรรมชาติ
-  */
 
   if (
     /(.)\1\1\1/i.test(
@@ -1221,10 +1212,6 @@ function englishWordLooksReal(
   }
 
 
-  /*
-    ตัวอักษรซ้ำชนิดเดิมมากเกินไป
-  */
-
   if (
     letters >= 9 &&
     unique <= 3 &&
@@ -1236,10 +1223,6 @@ function englishWordLooksReal(
   }
 
 
-  /*
-    คำยาวมากต้องมั่นใจสูง
-  */
-
   if (
     letters >= 18 &&
     confidence < 82
@@ -1249,10 +1232,6 @@ function englishWordLooksReal(
 
   }
 
-
-  /*
-    คำยาวแต่มีสระน้อยผิดปกติ
-  */
 
   if (
     letters >= 9 &&
@@ -1483,7 +1462,161 @@ function getLineWords(
   }
 
 
+  words.sort(
+    (a, b) => {
+
+      const ax =
+        Number(
+          a &&
+          a.bbox &&
+          a.bbox.x0
+            ? a.bbox.x0
+            : 0
+        );
+
+
+      const bx =
+        Number(
+          b &&
+          b.bbox &&
+          b.bbox.x0
+            ? b.bbox.x0
+            : 0
+        );
+
+
+      return ax - bx;
+
+    }
+  );
+
+
   return words;
+
+}
+
+
+/* =========================================================
+   CLEAN THAI OCR SEGMENTS
+========================================================= */
+
+function cleanThaiSegments(
+  segments
+) {
+
+  if (
+    !Array.isArray(
+      segments
+    ) ||
+    segments.length === 0
+  ) {
+
+    return "";
+
+  }
+
+
+  let result =
+    "";
+
+
+  for (
+    const segment
+    of segments
+  ) {
+
+    let text =
+      String(
+        segment || ""
+      ).trim();
+
+
+    if (!text)
+      continue;
+
+
+    /*
+      ลบช่องว่างที่ OCR แทรก
+      ระหว่างพยัญชนะ/สระ/วรรณยุกต์
+    */
+
+    text =
+      text.replace(
+        /\s+/g,
+        ""
+      );
+
+
+    /*
+      ถ้าเป็นภาษาไทย ให้ต่อกัน
+      ถ้าเป็นอังกฤษหรือตัวเลข
+      เว้นช่องว่างไว้
+    */
+
+    if (
+      /[ก-๙]/.test(
+        text
+      )
+    ) {
+
+      result +=
+        text;
+
+    } else {
+
+      if (
+        result &&
+        !result.endsWith(" ")
+      ) {
+
+        result +=
+          " ";
+
+      }
+
+
+      result +=
+        text;
+
+
+      result +=
+        " ";
+
+    }
+
+  }
+
+
+  result =
+    result
+      .replace(
+        /[ \t]+/g,
+        " "
+      )
+      .replace(
+        /\s+([ๆฯะาเแโใไ่้๊๋็์])/g,
+        "$1"
+      )
+      .replace(
+        /([เแโใไ])\s+/g,
+        "$1"
+      )
+      .trim();
+
+
+  /*
+    แก้กรณีที่ OCR แยกสระ/วรรณยุกต์
+    ออกมาเป็นช่องว่าง
+  */
+
+  result =
+    result.replace(
+      /([ก-๙])\s+([ก-๙])/g,
+      "$1$2"
+    );
+
+
+  return result.trim();
 
 }
 
@@ -1641,8 +1774,10 @@ function filterThaiLineWords(
     words.length === 0
   ) {
 
-    return cleanText(
-      line.text
+    return cleanThaiSegments(
+      String(
+        line.text || ""
+      ).split(/\s+/)
     );
 
   }
@@ -1705,8 +1840,10 @@ function filterThaiLineWords(
       ) >= 4
     ) {
 
-      return cleanText(
-        line.text
+      return cleanThaiSegments(
+        String(
+          line.text || ""
+        ).split(/\s+/)
       );
 
     }
@@ -1717,8 +1854,16 @@ function filterThaiLineWords(
   }
 
 
-  return accepted.join(
-    " "
+  /*
+    สำคัญ:
+    ภาษาไทยไม่ควรเอาแต่ละ OCR word
+    มาต่อด้วยช่องว่างเหมือนภาษาอังกฤษ
+
+    จึงใช้การรวมชิ้นไทยกลับเข้าด้วยกัน
+  */
+
+  return cleanThaiSegments(
+    accepted
   );
 
 }
@@ -2469,10 +2614,6 @@ function isEnglishNoiseLine(
   }
 
 
-  /*
-    แยกคำจริง
-  */
-
   const words =
     value
       .split(/\s+/)
@@ -2480,10 +2621,8 @@ function isEnglishNoiseLine(
 
 
   /*
-    กรณีเป็นคำเดียว
-    และยาวมาก
-    เช่น
-    wihoaudafuwfeiashiay
+    คำเดียวที่ยาวมาก
+    และไม่มีลักษณะเป็นประโยค
   */
 
   if (
@@ -2525,12 +2664,6 @@ function isEnglishNoiseLine(
       ).size;
 
 
-    /*
-      คำยาว 15+ ตัว
-      ถ้าไม่มีช่องว่างและรูปแบบผิดธรรมชาติ
-      ตัดทิ้ง
-    */
-
     if (
       vowels <= 3 ||
       consonants >= 10 ||
@@ -2543,11 +2676,6 @@ function isEnglishNoiseLine(
 
   }
 
-
-  /*
-    คำอังกฤษ 20+ ตัวติดกัน
-    ไม่ควรเป็นข้อความธรรมดา
-  */
 
   if (
     english >= 20 &&
@@ -2581,10 +2709,6 @@ function isEnglishNoiseLine(
 
   }
 
-
-  /*
-    ตรวจรูปแบบตัวพิมพ์ใหญ่เล็กที่สลับมั่ว
-  */
 
   if (
     english >= 10
@@ -2668,10 +2792,6 @@ function isThaiNoiseLine(
   }
 
 
-  /*
-    ตัวเลขเยอะผิดธรรมชาติ
-  */
-
   if (
     digits >= 3 &&
     digits >= thai
@@ -2682,10 +2802,6 @@ function isThaiNoiseLine(
   }
 
 
-  /*
-    อังกฤษปนเยอะ
-  */
-
   if (
     english > thai * 0.8
   ) {
@@ -2694,10 +2810,6 @@ function isThaiNoiseLine(
 
   }
 
-
-  /*
-    สัญลักษณ์มากผิดปกติ
-  */
 
   const symbols =
     (
@@ -2772,10 +2884,6 @@ function isFinalOCRNoise(
   }
 
 
-  /*
-    ภาษาอังกฤษ
-  */
-
   if (
     english > 0 &&
     thai === 0
@@ -2794,10 +2902,6 @@ function isFinalOCRNoise(
   }
 
 
-  /*
-    ภาษาไทย
-  */
-
   if (
     thai > 0
   ) {
@@ -2815,10 +2919,6 @@ function isFinalOCRNoise(
   }
 
 
-  /*
-    ตัวเลขเยอะกว่าตัวอักษร
-  */
-
   if (
     digits > letters &&
     letters < 8
@@ -2830,6 +2930,89 @@ function isFinalOCRNoise(
 
 
   return false;
+
+}
+
+
+/* =========================================================
+   MERGE THAI TEXT
+========================================================= */
+
+function normalizeThaiText(
+  text
+) {
+
+  if (!text)
+    return "";
+
+
+  let value =
+    String(text)
+      .replace(
+        /\r/g,
+        ""
+      );
+
+
+  /*
+    ลบช่องว่างระหว่างตัวอักษรไทย
+    ที่เกิดจาก OCR
+
+    เช่น
+    เธ อ ไม ่ ได ้
+    ↓
+    เธอไม่ได ้
+  */
+
+  value =
+    value.replace(
+      /([ก-๙])\s+(?=[ก-๙])/g,
+      "$1"
+    );
+
+
+  /*
+    ลบช่องว่างก่อนสระ/วรรณยุกต์
+  */
+
+  value =
+    value.replace(
+      /\s+([ะาิีึืุูัเแโใไำ่้๊๋็์ๆฯ])/g,
+      "$1"
+    );
+
+
+  /*
+    ลบช่องว่างหลังสระนำ
+  */
+
+  value =
+    value.replace(
+      /([เแโใไ])\s+(?=[ก-๙])/g,
+      "$1"
+    );
+
+
+  /*
+    ลบช่องว่างที่เหลือระหว่างภาษาไทย
+    แต่ไม่ลบช่องว่างก่อนภาษาอังกฤษ
+  */
+
+  value =
+    value.replace(
+      /([ก-๙])\s+([ก-๙])/g,
+      "$1$2"
+    );
+
+
+  value =
+    value.replace(
+      /[ \t]+/g,
+      " "
+    );
+
+
+  return value.trim();
 
 }
 
@@ -2910,11 +3093,42 @@ function mergeLines(
   );
 
 
-  return unique
-    .map(
-      item =>
-        item.text
-    )
+  const output = [];
+
+
+  for (
+    const item
+    of unique
+  ) {
+
+    let text =
+      item.text;
+
+
+    if (
+      item.language === "th"
+    ) {
+
+      text =
+        normalizeThaiText(
+          text
+        );
+
+    }
+
+
+    if (text) {
+
+      output.push(
+        text
+      );
+
+    }
+
+  }
+
+
+  return output
     .join("\n")
     .trim();
 
@@ -2949,9 +3163,36 @@ function cleanFinalOCR(
 
 
   for (
-    const line
+    const rawLine
     of lines
   ) {
+
+    let line =
+      rawLine;
+
+
+    /*
+      ถ้ามีภาษาไทย
+      จัดช่องว่างใหม่
+    */
+
+    if (
+      /[ก-๙]/.test(
+        line
+      )
+    ) {
+
+      line =
+        normalizeThaiText(
+          line
+        );
+
+    }
+
+
+    if (!line)
+      continue;
+
 
     if (
       isFinalOCRNoise(
