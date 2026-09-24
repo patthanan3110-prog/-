@@ -3,7 +3,7 @@
    Thai ↔ English
    script.js
    OCR: Tesseract.js
-   OCR 4-PASS + WORD POSITION VERSION
+   OCR IMPROVED VERSION
 ========================================= */
 
 
@@ -131,7 +131,10 @@ async function getTesseractWorker() {
     await tesseractWorker.setParameters({
 
       preserve_interword_spaces:
-        "1"
+        "1",
+
+      user_defined_dpi:
+        "300"
 
     });
 
@@ -513,7 +516,9 @@ function prepareOCRImage(
                   3600;
 
 
-                /* ขยายรูปเล็ก */
+                /* =================================
+                   ขยายรูปเล็ก
+                ================================= */
 
                 if (
                   width < minSize &&
@@ -539,7 +544,9 @@ function prepareOCRImage(
                 }
 
 
-                /* ลดรูปใหญ่ */
+                /* =================================
+                   ลดรูปใหญ่
+                ================================= */
 
                 if (
                   width > maxSize ||
@@ -602,7 +609,9 @@ function prepareOCRImage(
                 );
 
 
-                /* ORIGINAL */
+                /* =================================
+                   ORIGINAL
+                ================================= */
 
                 if (
                   mode === "original"
@@ -631,14 +640,16 @@ function prepareOCRImage(
                   imageData.data;
 
 
-                /* NORMAL */
+                /* =================================
+                   NORMAL
+                ================================= */
 
                 if (
                   mode === "normal"
                 ) {
 
                   const contrast =
-                    1.30;
+                    1.22;
 
                   const factor =
                     (259 *
@@ -699,7 +710,9 @@ function prepareOCRImage(
                 }
 
 
-                /* THRESHOLD */
+                /* =================================
+                   THRESHOLD
+                ================================= */
 
                 if (
                   mode === "threshold"
@@ -728,7 +741,7 @@ function prepareOCRImage(
 
 
                     const value =
-                      gray < 165
+                      gray < 170
                         ? 0
                         : 255;
 
@@ -747,14 +760,16 @@ function prepareOCRImage(
                 }
 
 
-                /* SHARP */
+                /* =================================
+                   SHARP
+                ================================= */
 
                 if (
                   mode === "sharp"
                 ) {
 
                   const contrast =
-                    1.50;
+                    1.38;
 
                   const factor =
                     (259 *
@@ -880,9 +895,7 @@ function prepareOCRImage(
    REBUILD TEXT FROM WORD POSITIONS
 ========================================= */
 
-function rebuildTextFromWords(
-  words
-) {
+function rebuildTextFromWords(words) {
 
   if (
     !Array.isArray(words) ||
@@ -944,13 +957,45 @@ function rebuildTextFromWords(
 
 
   /*
-   * เรียงจากบนลงล่าง
+   * ลบคำที่เป็นเศษสัญลักษณ์ล้วน
    */
 
-  validWords.sort(
+  const filteredWords =
+    validWords.filter(
+      function (word) {
+
+        const useful =
+          word.text.match(
+            /[ก-๙a-zA-Z0-9]/
+          );
+
+        return !!useful;
+
+      }
+    );
+
+
+  if (
+    filteredWords.length === 0
+  ) {
+
+    return "";
+
+  }
+
+
+  filteredWords.sort(
     function (a, b) {
 
-      return a.y0 - b.y0;
+      if (
+        a.y0 !== b.y0
+      ) {
+
+        return a.y0 - b.y0;
+
+      }
+
+      return a.x0 - b.x0;
 
     }
   );
@@ -960,10 +1005,10 @@ function rebuildTextFromWords(
 
 
   /*
-   * รวมคำที่อยู่ในระดับเดียวกัน
+   * รวมคำที่อยู่ในบรรทัดเดียวกัน
    */
 
-  validWords.forEach(
+  filteredWords.forEach(
     function (word) {
 
       const centerY =
@@ -997,11 +1042,20 @@ function rebuildTextFromWords(
           );
 
 
+        /*
+         * ใช้ tolerance ที่แคบลง
+         * เพื่อไม่ให้คนละบรรทัด
+         * ถูกจับมารวมกัน
+         */
+
         const tolerance =
           Math.max(
-            height,
-            line.averageHeight
-          ) * 0.65;
+            8,
+            Math.min(
+              height,
+              line.averageHeight
+            ) * 0.55
+          );
 
 
         if (
@@ -1062,10 +1116,6 @@ function rebuildTextFromWords(
   );
 
 
-  /*
-   * เรียงบรรทัดบน → ล่าง
-   */
-
   lines.sort(
     function (a, b) {
 
@@ -1075,10 +1125,6 @@ function rebuildTextFromWords(
     }
   );
 
-
-  /*
-   * เรียงคำซ้าย → ขวา
-   */
 
   const output =
     lines.map(
@@ -1094,15 +1140,69 @@ function rebuildTextFromWords(
         );
 
 
-        return line.words
-          .map(
-            function (word) {
+        let lineText =
+          "";
 
-              return word.text;
+
+        line.words.forEach(
+          function (word, index) {
+
+            if (
+              index === 0
+            ) {
+
+              lineText =
+                word.text;
+
+              return;
 
             }
-          )
-          .join(" ");
+
+
+            const previous =
+              line.words[index - 1];
+
+
+            const gap =
+              word.x0 -
+              previous.x1;
+
+
+            const averageHeight =
+              Math.max(
+                1,
+                line.averageHeight
+              );
+
+
+            /*
+             * ถ้าคำอยู่ติดกันมาก
+             * ไม่ใส่ช่องว่าง
+             *
+             * เหมาะกับภาษาไทย
+             */
+
+            if (
+              gap <
+              averageHeight * 0.18
+            ) {
+
+              lineText +=
+                word.text;
+
+            } else {
+
+              lineText +=
+                " " +
+                word.text;
+
+            }
+
+          }
+        );
+
+
+        return lineText.trim();
 
       }
     );
@@ -1112,7 +1212,7 @@ function rebuildTextFromWords(
     .filter(
       function (line) {
 
-        return line.trim();
+        return line.length > 0;
 
       }
     )
@@ -1146,7 +1246,10 @@ async function recognizeOCR(
       String(pageMode),
 
     preserve_interword_spaces:
-      "1"
+      "1",
+
+    user_defined_dpi:
+      "300"
 
   });
 
@@ -1177,39 +1280,18 @@ async function recognizeOCR(
       : [];
 
 
-  /*
-   * PSM 11 ใช้ตำแหน่งคำ
-   * เพื่อจัดลำดับใหม่
-   */
-
-  let text =
-    rawText;
+  let rebuiltText =
+    "";
 
 
   if (
-    pageMode === 11 &&
     words.length > 0
   ) {
 
-    const rebuilt =
+    rebuiltText =
       rebuildTextFromWords(
         words
       );
-
-
-    if (
-      rebuilt &&
-      rebuilt.length >=
-      Math.min(
-        5,
-        rawText.length
-      )
-    ) {
-
-      text =
-        rebuilt;
-
-    }
 
   }
 
@@ -1235,7 +1317,7 @@ async function recognizeOCR(
         rawText,
 
       rebuilt:
-        text
+        rebuiltText
     }
   );
 
@@ -1243,10 +1325,13 @@ async function recognizeOCR(
   return {
 
     text:
-      text,
+      rawText,
 
     rawText:
       rawText,
+
+    rebuiltText:
+      rebuiltText,
 
     confidence:
       confidence,
@@ -1255,6 +1340,83 @@ async function recognizeOCR(
       modeName
 
   };
+
+}
+
+
+/* =========================================
+   CREATE OCR CANDIDATES
+========================================= */
+
+function createOCRCandidates(results) {
+
+  const candidates = [];
+
+
+  results.forEach(
+    function (result) {
+
+      if (
+        !result
+      ) {
+        return;
+      }
+
+
+      if (
+        result.rawText &&
+        result.rawText.trim()
+      ) {
+
+        candidates.push({
+
+          text:
+            result.rawText.trim(),
+
+          confidence:
+            result.confidence,
+
+          mode:
+            result.mode +
+            " / raw",
+
+          sourceMode:
+            result.mode
+
+        });
+
+      }
+
+
+      if (
+        result.rebuiltText &&
+        result.rebuiltText.trim()
+      ) {
+
+        candidates.push({
+
+          text:
+            result.rebuiltText.trim(),
+
+          confidence:
+            result.confidence,
+
+          mode:
+            result.mode +
+            " / position",
+
+          sourceMode:
+            result.mode
+
+        });
+
+      }
+
+    }
+  );
+
+
+  return candidates;
 
 }
 
@@ -1335,6 +1497,18 @@ function scoreOCRResult(
       : 0;
 
 
+  const numberMatches =
+    text.match(
+      /[0-9]/g
+    );
+
+
+  const numberCount =
+    numberMatches
+      ? numberMatches.length
+      : 0;
+
+
   const confidence =
     Number(
       result.confidence
@@ -1342,11 +1516,11 @@ function scoreOCRResult(
 
 
   let score =
-    confidence * 0.65;
+    confidence * 0.45;
 
 
   score +=
-    usefulRatio * 30;
+    usefulRatio * 35;
 
 
   /*
@@ -1358,7 +1532,7 @@ function scoreOCRResult(
     thaiCount >= 3
   ) {
 
-    score += 8;
+    score += 10;
 
   }
 
@@ -1368,26 +1542,39 @@ function scoreOCRResult(
     thaiCount >= 10
   ) {
 
-    score += 8;
+    score += 10;
 
   }
 
 
   /*
-   * อังกฤษ
+   * ภาษาอังกฤษ
    */
 
   if (
     englishCount >= 5
   ) {
 
-    score += 3;
+    score += 5;
 
   }
 
 
   /*
-   * มีข้อความจำนวนพอดี
+   * ตัวเลข
+   */
+
+  if (
+    numberCount >= 2
+  ) {
+
+    score += 2;
+
+  }
+
+
+  /*
+   * มีข้อความมากพอ
    */
 
   if (
@@ -1408,14 +1595,22 @@ function scoreOCRResult(
   }
 
 
+  if (
+    usefulCount >= 30
+  ) {
+
+    score += 5;
+
+  }
+
+
   /*
-   * ลงโทษข้อความที่มี
-   * เครื่องหมายมั่วเยอะ
+   * ลงโทษอักขระแปลก
    */
 
   const strangeMatches =
     text.match(
-      /[^ก-๙a-zA-Z0-9\s.,!?()\-:/'%]/g
+      /[^ก-๙a-zA-Z0-9\s.,!?()\-:/'%&+]/g
     );
 
 
@@ -1427,16 +1622,112 @@ function scoreOCRResult(
 
   score -=
     Math.min(
-      15,
-      strangeCount * 0.5
+      25,
+      strangeCount * 0.8
     );
+
+
+  /*
+   * ลงโทษคำภาษาอังกฤษที่ยาวผิดปกติ
+   * เพราะมักเกิดจาก OCR ภาษาไทยอ่านมั่ว
+   */
+
+  const strangeEnglishWords =
+    text.match(
+      /\b[a-zA-Z]{12,}\b/g
+    );
+
+
+  if (
+    strangeEnglishWords
+  ) {
+
+    score -=
+      strangeEnglishWords.length * 3;
+
+  }
+
+
+  /*
+   * ลงโทษบรรทัดสั้น ๆ ที่เป็นเศษ
+   */
+
+  const lines =
+    text
+      .split("\n")
+      .map(
+        function (line) {
+
+          return line.trim();
+
+        }
+      )
+      .filter(
+        function (line) {
+
+          return line.length > 0;
+
+        }
+      );
+
+
+  let shortGarbageLines =
+    0;
+
+
+  lines.forEach(
+    function (line) {
+
+      const useful =
+        line.match(
+          /[ก-๙a-zA-Z0-9]/g
+        );
+
+
+      const count =
+        useful
+          ? useful.length
+          : 0;
+
+
+      if (
+        count <= 1
+      ) {
+
+        shortGarbageLines++;
+
+      }
+
+    }
+  );
+
+
+  score -=
+    Math.min(
+      12,
+      shortGarbageLines * 2
+    );
+
+
+  /*
+   * ถ้ามีภาษาไทยหลายคำ
+   * ให้โบนัสเพิ่มเติม
+   */
+
+  if (
+    thaiCount >= 20
+  ) {
+
+    score += 8;
+
+  }
 
 
   if (
     usefulCount < 3
   ) {
 
-    score -= 30;
+    score -= 40;
 
   }
 
@@ -1454,6 +1745,12 @@ function selectBestOCRResult(
   results
 ) {
 
+  const candidates =
+    createOCRCandidates(
+      results
+    );
+
+
   let best =
     null;
 
@@ -1461,19 +1758,21 @@ function selectBestOCRResult(
     -999;
 
 
-  results.forEach(
-    function (result) {
+  candidates.forEach(
+    function (candidate) {
 
       const score =
         scoreOCRResult(
-          result
+          candidate
         );
 
 
       console.log(
-        "OCR SCORE:",
-        result.mode,
-        score
+        "OCR CANDIDATE:",
+        candidate.mode,
+        "SCORE:",
+        score,
+        candidate.text
       );
 
 
@@ -1483,7 +1782,7 @@ function selectBestOCRResult(
       ) {
 
         best =
-          result;
+          candidate;
 
         bestScore =
           score;
@@ -1492,6 +1791,67 @@ function selectBestOCRResult(
 
     }
   );
+
+
+  /*
+   * ถ้าผลที่จัดตำแหน่งใหม่
+   * แย่กว่าข้อความดิบมาก
+   * ให้กลับไปใช้ raw
+   */
+
+  if (
+    best &&
+    best.mode.includes("position")
+  ) {
+
+    const sameSource =
+      candidates.find(
+        function (candidate) {
+
+          return (
+            candidate.sourceMode ===
+            best.sourceMode &&
+            candidate.mode.includes(
+              "raw"
+            )
+          );
+
+        }
+      );
+
+
+    if (
+      sameSource
+    ) {
+
+      const rawScore =
+        scoreOCRResult(
+          sameSource
+        );
+
+
+      if (
+        rawScore >
+        bestScore - 3
+      ) {
+
+        /*
+         * ถ้าคะแนนใกล้กัน
+         * ใช้ raw เพราะ Tesseract
+         * มักจัดบรรทัดได้ดีกว่า
+         */
+
+        best =
+          sameSource;
+
+        bestScore =
+          rawScore;
+
+      }
+
+    }
+
+  }
 
 
   console.log(
@@ -1575,7 +1935,7 @@ async function runOCR(file) {
 
     /* =====================================
        PASS 2
-       NORMAL + PSM 6
+       NORMAL + PSM 11
     ===================================== */
 
     ocrText.value =
@@ -1584,6 +1944,37 @@ async function runOCR(file) {
 
     showStatus(
       "กำลังวิเคราะห์ภาพรอบที่ 2...",
+      "success"
+    );
+
+
+    const normalSparseImage =
+      await prepareOCRImage(
+        file,
+        "normal"
+      );
+
+
+    const resultNormalSparse =
+      await recognizeOCR(
+        worker,
+        normalSparseImage,
+        "normal-sparse",
+        11
+      );
+
+
+    /* =====================================
+       PASS 3
+       NORMAL + PSM 6
+    ===================================== */
+
+    ocrText.value =
+      "กำลังอ่านข้อความรอบที่ 3...";
+
+
+    showStatus(
+      "กำลังวิเคราะห์ภาพรอบที่ 3...",
       "success"
     );
 
@@ -1605,16 +1996,16 @@ async function runOCR(file) {
 
 
     /* =====================================
-       PASS 3
+       PASS 4
        THRESHOLD + PSM 11
     ===================================== */
 
     ocrText.value =
-      "กำลังอ่านข้อความรอบที่ 3...";
+      "กำลังอ่านข้อความรอบที่ 4...";
 
 
     showStatus(
-      "กำลังวิเคราะห์ภาพรอบที่ 3...",
+      "กำลังวิเคราะห์ภาพรอบที่ 4...",
       "success"
     );
 
@@ -1636,7 +2027,7 @@ async function runOCR(file) {
 
 
     /* =====================================
-       PASS 4
+       PASS 5
        SHARP + PSM 6
     ===================================== */
 
@@ -1667,12 +2058,13 @@ async function runOCR(file) {
 
 
     /* =====================================
-       SELECT
+       SELECT BEST
     ===================================== */
 
     const bestResult =
       selectBestOCRResult([
         resultOriginal,
+        resultNormalSparse,
         resultNormal,
         resultThreshold,
         resultSharp
@@ -1781,15 +2173,19 @@ function cleanOCRText(text) {
 
   cleaned =
     cleaned.replace(
-      /[ \t]+/g,
-      " "
+      /\r/g,
+      "\n"
     );
 
 
+  /*
+   * ลบช่องว่างซ้ำ
+   */
+
   cleaned =
     cleaned.replace(
-      /\n{3,}/g,
-      "\n\n"
+      /[ \t]+/g,
+      " "
     );
 
 
@@ -1806,7 +2202,8 @@ function cleanOCRText(text) {
 
 
   /*
-   * ลบช่องว่างต้นท้าย
+   * ลบบรรทัดที่เป็น
+   * ตัวอักษร/เครื่องหมายมั่วสั้นมาก
    */
 
   cleaned =
@@ -1822,11 +2219,64 @@ function cleanOCRText(text) {
       .filter(
         function (line) {
 
-          return line.length > 0;
+          if (!line) {
+            return false;
+          }
+
+
+          const useful =
+            line.match(
+              /[ก-๙a-zA-Z0-9]/g
+            );
+
+
+          const usefulCount =
+            useful
+              ? useful.length
+              : 0;
+
+
+          /*
+           * ถ้าเป็นเพียง
+           * เครื่องหมายหรืออักขระเดียว
+           * ให้ตัดออก
+           */
+
+          if (
+            usefulCount === 0
+          ) {
+
+            return false;
+
+          }
+
+
+          if (
+            usefulCount === 1 &&
+            line.length <= 3
+          ) {
+
+            return false;
+
+          }
+
+
+          return true;
 
         }
       )
       .join("\n");
+
+
+  /*
+   * ลดบรรทัดว่างซ้ำ
+   */
+
+  cleaned =
+    cleaned.replace(
+      /\n{3,}/g,
+      "\n\n"
+    );
 
 
   return cleaned.trim();
@@ -2457,5 +2907,5 @@ resultText.classList.add(
 
 
 console.log(
-  "🌐 ผู้ช่วยแปลภาษา + Tesseract.js OCR 4-PASS พร้อมใช้งาน"
+  "🌐 ผู้ช่วยแปลภาษา + Tesseract.js OCR IMPROVED VERSION พร้อมใช้งาน"
 );
