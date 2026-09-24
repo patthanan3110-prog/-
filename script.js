@@ -1,8 +1,8 @@
 /* =========================================================
    ผู้ช่วยแปลภาษา
    Thai ↔ English
-   SCRIPT.JS - OCR + SOURCE ONLY TRANSLATION
-   VERSION 53
+   SCRIPT.JS - OCR + CAMERA OCR IMPROVEMENT
+   VERSION 54
    ========================================================= */
 
 "use strict";
@@ -416,13 +416,28 @@ function handleImageSelected(event) {
   }
 
 
+  /*
+    ตรวจว่าเป็นรูปจากกล้องหรือไม่
+    เพื่อให้ OCR ใช้ preprocessing
+    ที่ละเอียดขึ้น
+  */
+
+  const fromCamera =
+    event.target === cameraInput;
+
+
   showStatus(
-    "กำลังอ่านรูปภาพ...",
+    fromCamera
+      ? "กำลังปรับภาพจากกล้องและอ่านตัวอักษร..."
+      : "กำลังอ่านรูปภาพ...",
     "info"
   );
 
 
-  startOCR(file);
+  startOCR(
+    file,
+    fromCamera
+  );
 }
 
 
@@ -546,6 +561,7 @@ async function loadTesseract() {
               );
 
             }
+
           }
         );
 
@@ -602,6 +618,7 @@ async function loadTesseract() {
             );
 
           }
+
         };
 
 
@@ -725,17 +742,32 @@ function loadImage(file) {
    PREPARE IMAGE
    ========================================================= */
 
-async function prepareImage(file) {
+async function prepareImage(
+  file,
+  fromCamera = false
+) {
 
   const img =
     await loadImage(file);
 
 
+  /*
+    กล้องมือถือบางเครื่องส่งภาพใหญ่มาก
+    แต่บางเครื่องลดความละเอียดมาแล้ว
+
+    เราเพิ่มขนาดภาพเล็ก ๆ ให้ OCR
+    ในกรณีที่ตัวหนังสือเล็ก
+  */
+
   const maxWidth =
-    2800;
+    fromCamera
+      ? 3200
+      : 2800;
 
   const maxHeight =
-    2800;
+    fromCamera
+      ? 3200
+      : 2800;
 
 
   let width =
@@ -771,6 +803,37 @@ async function prepareImage(file) {
     );
 
 
+  /*
+    ถ้าภาพจากกล้องเล็กมาก
+    ขยายขึ้นก่อน OCR
+  */
+
+  if (
+    fromCamera &&
+    width < 1600
+  ) {
+
+    const enlarge =
+      Math.min(
+        2,
+        1600 / width
+      );
+
+
+    width =
+      Math.round(
+        width * enlarge
+      );
+
+
+    height =
+      Math.round(
+        height * enlarge
+      );
+
+  }
+
+
   const canvas =
     document.createElement(
       "canvas"
@@ -793,6 +856,17 @@ async function prepareImage(file) {
     );
 
 
+  /*
+    ปรับคุณภาพการวาดภาพ
+  */
+
+  ctx.imageSmoothingEnabled =
+    true;
+
+  ctx.imageSmoothingQuality =
+    "high";
+
+
   ctx.drawImage(
     img,
     0,
@@ -802,7 +876,7 @@ async function prepareImage(file) {
   );
 
 
-  return {
+  const result = {
 
     normal:
       canvas.toDataURL(
@@ -827,6 +901,42 @@ async function prepareImage(file) {
       )
 
   };
+
+
+  /*
+    รูปจากกล้องจะเพิ่ม variant
+    สำหรับตัวหนังสือเล็กและภาพไม่คม
+  */
+
+  if (fromCamera) {
+
+    result.cameraSharp =
+      createCameraSharpVariant(
+        canvas
+      );
+
+
+    result.cameraSoft =
+      createCameraSoftVariant(
+        canvas
+      );
+
+
+    result.cameraThreshold =
+      createAdaptiveThresholdVariant(
+        canvas
+      );
+
+
+    result.cameraDarkText =
+      createDarkTextVariant(
+        canvas
+      );
+
+  }
+
+
+  return result;
 }
 
 
@@ -968,6 +1078,377 @@ function createEnhancedVariant(
 
 
 /* =========================================================
+   CAMERA SHARP VARIANT
+   ========================================================= */
+
+function createCameraSharpVariant(
+  sourceCanvas
+) {
+
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
+
+
+  canvas.width =
+    sourceCanvas.width;
+
+  canvas.height =
+    sourceCanvas.height;
+
+
+  const ctx =
+    canvas.getContext(
+      "2d",
+      {
+        willReadFrequently: true
+      }
+    );
+
+
+  ctx.drawImage(
+    sourceCanvas,
+    0,
+    0
+  );
+
+
+  const imageData =
+    ctx.getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+
+  const data =
+    imageData.data;
+
+
+  /*
+    เพิ่ม contrast + sharpen แบบเบา
+    เพื่อไม่ทำลายตัวอักษรไทย
+  */
+
+  for (
+    let i = 0;
+    i < data.length;
+    i += 4
+  ) {
+
+    const r =
+      data[i];
+
+    const g =
+      data[i + 1];
+
+    const b =
+      data[i + 2];
+
+
+    const gray =
+      0.299 * r +
+      0.587 * g +
+      0.114 * b;
+
+
+    const contrast =
+      ((gray - 128) * 1.45) +
+      128;
+
+
+    data[i] =
+      clamp(contrast);
+
+    data[i + 1] =
+      clamp(contrast);
+
+    data[i + 2] =
+      clamp(contrast);
+
+  }
+
+
+  ctx.putImageData(
+    imageData,
+    0,
+    0
+  );
+
+
+  return canvas.toDataURL(
+    "image/png"
+  );
+}
+
+
+/* =========================================================
+   CAMERA SOFT VARIANT
+   ========================================================= */
+
+function createCameraSoftVariant(
+  sourceCanvas
+) {
+
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
+
+
+  canvas.width =
+    sourceCanvas.width;
+
+  canvas.height =
+    sourceCanvas.height;
+
+
+  const ctx =
+    canvas.getContext(
+      "2d",
+      {
+        willReadFrequently: true
+      }
+    );
+
+
+  ctx.filter =
+    "contrast(1.18) brightness(1.04)";
+
+
+  ctx.drawImage(
+    sourceCanvas,
+    0,
+    0
+  );
+
+
+  ctx.filter =
+    "none";
+
+
+  return canvas.toDataURL(
+    "image/png"
+  );
+}
+
+
+/* =========================================================
+   ADAPTIVE THRESHOLD
+   ========================================================= */
+
+function createAdaptiveThresholdVariant(
+  sourceCanvas
+) {
+
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
+
+
+  canvas.width =
+    sourceCanvas.width;
+
+  canvas.height =
+    sourceCanvas.height;
+
+
+  const ctx =
+    canvas.getContext(
+      "2d",
+      {
+        willReadFrequently: true
+      }
+    );
+
+
+  ctx.drawImage(
+    sourceCanvas,
+    0,
+    0
+  );
+
+
+  const imageData =
+    ctx.getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+
+  const data =
+    imageData.data;
+
+
+  /*
+    ใช้ค่าเฉลี่ยแสงรอบ ๆ แบบง่าย
+    เพื่อไม่ให้พื้นหลังสว่าง/มืดทำลายตัวอักษร
+  */
+
+  for (
+    let i = 0;
+    i < data.length;
+    i += 4
+  ) {
+
+    const gray =
+      0.299 * data[i] +
+      0.587 * data[i + 1] +
+      0.114 * data[i + 2];
+
+
+    let value;
+
+
+    if (gray < 145) {
+
+      value =
+        0;
+
+    } else if (gray > 195) {
+
+      value =
+        255;
+
+    } else {
+
+      value =
+        gray < 170
+          ? 0
+          : 255;
+
+    }
+
+
+    data[i] =
+      value;
+
+    data[i + 1] =
+      value;
+
+    data[i + 2] =
+      value;
+
+  }
+
+
+  ctx.putImageData(
+    imageData,
+    0,
+    0
+  );
+
+
+  return canvas.toDataURL(
+    "image/png"
+  );
+}
+
+
+/* =========================================================
+   DARK TEXT VARIANT
+   ========================================================= */
+
+function createDarkTextVariant(
+  sourceCanvas
+) {
+
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
+
+
+  canvas.width =
+    sourceCanvas.width;
+
+  canvas.height =
+    sourceCanvas.height;
+
+
+  const ctx =
+    canvas.getContext(
+      "2d",
+      {
+        willReadFrequently: true
+      }
+    );
+
+
+  ctx.drawImage(
+    sourceCanvas,
+    0,
+    0
+  );
+
+
+  const imageData =
+    ctx.getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+
+  const data =
+    imageData.data;
+
+
+  for (
+    let i = 0;
+    i < data.length;
+    i += 4
+  ) {
+
+    const gray =
+      0.299 * data[i] +
+      0.587 * data[i + 1] +
+      0.114 * data[i + 2];
+
+
+    /*
+      ทำให้พื้นหลังเป็นขาว
+      และตัวอักษรเข้มขึ้น
+    */
+
+    const value =
+      gray < 180
+        ? 0
+        : 255;
+
+
+    data[i] =
+      value;
+
+    data[i + 1] =
+      value;
+
+    data[i + 2] =
+      value;
+
+  }
+
+
+  ctx.putImageData(
+    imageData,
+    0,
+    0
+  );
+
+
+  return canvas.toDataURL(
+    "image/png"
+  );
+}
+
+
+/* =========================================================
    THRESHOLD
    ========================================================= */
 
@@ -1080,7 +1561,10 @@ function clamp(value) {
    START OCR
    ========================================================= */
 
-async function startOCR(file) {
+async function startOCR(
+  file,
+  fromCamera = false
+) {
 
   if (ocrRunning) {
     return;
@@ -1097,12 +1581,17 @@ async function startOCR(file) {
 
 
     showLoading(
-      "กำลังอ่านตัวอักษรจากรูป..."
+      fromCamera
+        ? "กำลังปรับภาพจากกล้องและอ่านข้อความ..."
+        : "กำลังอ่านตัวอักษรจากรูป..."
     );
 
 
     const variants =
-      await prepareImage(file);
+      await prepareImage(
+        file,
+        fromCamera
+      );
 
 
     const attempts =
@@ -1179,8 +1668,55 @@ async function startOCR(file) {
     ];
 
 
+    /*
+      เพิ่ม variant เฉพาะกล้อง
+    */
+
+    if (fromCamera) {
+
+      variantList.push(
+
+        {
+          name:
+            "cameraSharp",
+
+          image:
+            variants.cameraSharp
+        },
+
+        {
+          name:
+            "cameraSoft",
+
+          image:
+            variants.cameraSoft
+        },
+
+        {
+          name:
+            "cameraThreshold",
+
+          image:
+            variants.cameraThreshold
+        },
+
+        {
+          name:
+            "cameraDarkText",
+
+          image:
+            variants.cameraDarkText
+        }
+
+      );
+
+    }
+
+
     const psmModes =
-      [6, 11];
+      fromCamera
+        ? [6, 11, 12]
+        : [6, 11];
 
 
     for (
@@ -1241,6 +1777,7 @@ async function startOCR(file) {
             );
 
           }
+
         }
       }
     }
@@ -1248,7 +1785,8 @@ async function startOCR(file) {
 
     const best =
       selectBestOCRResult(
-        attempts
+        attempts,
+        fromCamera
       );
 
 
@@ -1280,7 +1818,7 @@ async function startOCR(file) {
 
 
     /*
-      แสดงข้อความ OCR จริง
+      แสดง OCR
     */
 
     if (ocrText) {
@@ -1300,7 +1838,7 @@ async function startOCR(file) {
 
 
     /*
-      ใส่ OCR ลงช่องต้นฉบับด้วย
+      ใส่ OCR ลงช่องต้นฉบับ
     */
 
     if (inputText) {
@@ -1329,7 +1867,9 @@ async function startOCR(file) {
 
 
     showStatus(
-      "อ่านและแปลจากรูปเรียบร้อยแล้ว",
+      fromCamera
+        ? "อ่านและแปลจากกล้องเรียบร้อยแล้ว"
+        : "อ่านและแปลจากรูปเรียบร้อยแล้ว",
       "success"
     );
 
@@ -1503,12 +2043,50 @@ function buildOCRCandidate(
     );
 
 
+  /*
+    เพิ่มคะแนนให้ OCR ที่มี
+    ไทย + อังกฤษสมดุล
+    โดยเฉพาะรูปกล้อง
+  */
+
+  let mixedBonus =
+    0;
+
+
+  const thaiCount =
+    (
+      text.match(
+        /[ก-๙]/g
+      ) || []
+    ).length;
+
+
+  const englishCount =
+    (
+      text.match(
+        /[A-Za-z]/g
+      ) || []
+    ).length;
+
+
+  if (
+    thaiCount > 0 &&
+    englishCount > 0
+  ) {
+
+    mixedBonus =
+      8;
+
+  }
+
+
   const score =
-    confidenceScore * 0.38 +
-    structureScore * 0.22 +
-    languageScore * 0.14 +
-    characterScore * 0.14 +
-    lineScore * 0.12 -
+    confidenceScore * 0.34 +
+    structureScore * 0.23 +
+    languageScore * 0.13 +
+    characterScore * 0.15 +
+    lineScore * 0.15 +
+    mixedBonus -
     garbagePenalty * 0.30;
 
 
@@ -1535,7 +2113,8 @@ function buildOCRCandidate(
    ========================================================= */
 
 function selectBestOCRResult(
-  candidates
+  candidates,
+  fromCamera = false
 ) {
 
   if (!candidates.length) {
@@ -1547,6 +2126,44 @@ function selectBestOCRResult(
     removeDuplicateCandidates(
       candidates
     );
+
+
+  /*
+    รูปจากกล้อง:
+    ไม่ให้ OCR ที่ confidence สูงอย่างเดียว
+    ชนะข้อความที่มีโครงสร้างดีมากเกินไป
+
+    เพราะบางครั้ง Tesseract ให้ confidence สูง
+    กับข้อความไทยที่อ่านผิดเป็นตัวอื่น
+  */
+
+  if (fromCamera) {
+
+    unique.forEach(
+      candidate => {
+
+        if (
+          candidate.lines >= 2
+        ) {
+
+          candidate.score += 5;
+
+        }
+
+
+        if (
+          candidate.language ===
+          "mixed"
+        ) {
+
+          candidate.score += 4;
+
+        }
+
+      }
+    );
+
+  }
 
 
   unique.sort(
@@ -1932,6 +2549,7 @@ function scoreTextStructure(
     ) {
 
       score += 8;
+
     }
 
   }
@@ -2091,19 +2709,13 @@ function normalizeForComparison(
    ========================================================= */
 
 /*
-  สำคัญมาก
-
-  ไม่แปลทุกบรรทัดในภาพ
-
   ไทย → อังกฤษ:
       เอาเฉพาะไทย
       แปลเป็นอังกฤษ
-      ไม่เอาอังกฤษต้นฉบับมาแสดง
 
   อังกฤษ → ไทย:
       เอาเฉพาะอังกฤษ
       แปลเป็นไทย
-      ไม่เอาไทยต้นฉบับมาแสดง
 */
 
 async function autoTranslateOCR(
@@ -2245,11 +2857,6 @@ function isSourceLine(
 
   if (source === "th") {
 
-    /*
-      ถ้ามีไทยชัดเจน
-      ถือเป็นภาษาไทย
-    */
-
     if (
       thaiCount >= 2 &&
       thaiCount >=
@@ -2259,11 +2866,6 @@ function isSourceLine(
       return true;
     }
 
-
-    /*
-      ถ้าอังกฤษเด่น
-      ไม่เอาไปแปล
-    */
 
     return false;
   }
@@ -2275,11 +2877,6 @@ function isSourceLine(
 
   if (source === "en") {
 
-    /*
-      ต้องมีตัวอังกฤษ
-      และไม่ใช่ไทยเป็นหลัก
-    */
-
     if (
       englishCount >= 2 &&
       englishCount >
@@ -2287,8 +2884,8 @@ function isSourceLine(
     ) {
 
       /*
-        ป้องกัน OCR มั่วแบบ
-        "It's only หอน"
+        ป้องกันข้อความ OCR
+        ที่ภาษาไทยปนเข้ามาหนักเกินไป
       */
 
       if (
@@ -2442,20 +3039,15 @@ async function translateText() {
     );
 
 
+    /*
+      สำคัญ:
+      การพิมพ์เองต้องแปลข้อความทั้งหมด
+      ไม่ใช้ extractSourceText
+      เพราะผู้ใช้ตั้งใจป้อนข้อความอยู่แล้ว
+    */
+
     const sourceText =
-      extractSourceText(
-        text,
-        sourceLanguage
-      );
-
-
-    if (!sourceText) {
-
-      throw new Error(
-        "ไม่พบข้อความภาษาต้นทาง"
-      );
-
-    }
+      text;
 
 
     const translated =
